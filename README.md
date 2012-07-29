@@ -24,4 +24,10 @@ level remove the "book" concept that originally led to these pages.
 
 # More Thanks
 
-More Thanks go to the users that have contributed and linked to the guide over the years!
+More thanks go to the users that have contributed and linked to the guide over the years!
+
+# Licence
+
+This documentation is released under the GNU Free Documentation Licence with_certain_conditions.
+
+See the [Copyright](http://www.deckle.co.za/squid-users-guide/copyright.html) page for more details
