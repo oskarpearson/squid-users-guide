@@ -22,3 +22,7 @@ h1 {
 div.page-header {
   margin-top: 1.5em;
 }
+footer p {
+  font-size: small;
+  font-weight: normal;
+}
