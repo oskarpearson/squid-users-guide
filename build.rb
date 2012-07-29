@@ -66,6 +66,7 @@ class Page
     @page = page
     @title = title
     @next_chapter = next_chapter
+    @next_chapter_title = next_chapter_title
     @suppress_page_header = suppress_page_header
     @suppress_page_footer = suppress_page_footer
     @fn = fn
