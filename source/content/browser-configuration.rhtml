@@ -1,0 +1,327 @@
+<h1>Browser Configuration</h1>
+<h2>Browsers</h2>
+
+<p>Squid is the server half of a client-server relationship. Though you have configured Squid, your client (the browser) is still configured to talk to the menagerie of servers that make up the Internet.
+</p>
+
+<p>You have already used the <em>client</em> program included with Squid to test that the cache is working. Browsers are more complicated to configure than <em>client</em>, especially since there are so many different types of browsers.
+</p>
+
+<p>This chapter covers the three most common browsers. It also includes information on the proxy configuration of Unix tools, since you may wish to use these for automatic download of pages. Once your browser is configured, some of the proxy-oriented features of browsers are covered. Many browsers allow you to force your cache server to reload the page, and have other proxy-specific features.
+</p>
+
+<p>So that you can skip sections in this chapter that you don't need to read, browsers are configured in the following order: Netscape Communicator, Microsoft Internet Explorer, Opera and finally Unix Clients.
+</p>
+
+<p>You can configure most browsers in more than one way. The first method is the simplest for a sysadmin, the second is simplest for the user. Since this book is written for system administrators, we term the first <em>basic configuration</em>, the second <em>advanced configuration</em>.
+</p>
+
+<h3>Basic Configuration</h3>
+
+<p>In this mode, each browser is configured independently to the others. If you need to change something about the server (the port that it accepts requests on, for example), each browser will have to be reconfigured manually: you will have to physically walk to it and change the setup. To avoid caching intranet sites, you will have to add exclusions for each intranet site.
+</p>
+
+<h3>Advanced Configuration</h3>
+<p>In this mode, you will configure a so-called <em>rule server</em>. Clients connect to this server on startup, and download information on which proxy server to talk to, and which URLs to retrieve from which proxy server. Exclusion of intranet sites is handled centrally: so one change will update all clients. If your organization is large, or is growing, you should use the auto-config option.
+</p>
+
+<p>Though this method is called <em>auto-config</em>, it's not completely automatic, since the user still has to enter a URL indicating the location of the list of rules. Advanced configuration has some advantages:
+</p>
+
+<ul>
+<li>Changes to the proxy server are easy, since you only change the rule server.</li>
+<li>A proxy server can be chosen based on destination machine name, destination port and more. Since this list is maintained centrally, changes also only have to be made once.</li>
+<li>Browser configuration is easy, instead of adding complicated lists of IP's, a user simply has to type in a URL.</li>
+<li>Since it's easy to configure, users are more likely to use the cache.</li>
+</ul>
+
+<p>When you write your list of rules (also called a proxy auto-config script), you will still need to supply the client with the same information as with the basic configuration, it's just that the list of this information is maintained centrally. Even if you decide to use only autoconfig on your network, you should probably work through the basic configuration first.
+</p>
+
+<h3>Basic Configuration</h3>
+<p>To configure any browser, you need at least two pieces of information:
+</p>
+
+<ul>
+<li>The proxy server's host name</li>
+<li>The port that the proxy server is accepting requests on</li>
+</ul>
+
+<h3>Host name</h3>
+
+<p>It's very important to use a proxy specific host name. If you decide to move the cache to another machine at a later stage you will find that it's much easier to change DNS settings than to change the configuration of every browser on your network.
+</p>
+
+<p>If your operating system supports IP aliases you should organize a dedicated IP address for the cache server, and use the <code class='squid-tag-inline'>tcp_incoming_address</code> and <code class='squid-tag-inline'>tcp_outgoing_address</code> squid.conf options to make Squid only accept incoming HTTP requests on that IP address.
+</p>
+
+<p>There isn't really a naming convention for caches, but people generally use one of the following: <em>cache, proxy, www-proxy, www-cache</em>, or even the name of the product they are using; <em>squid, netapp, netscape</em>. Some people also include the location of the cache, and configure people in a region to talk to their local cache. More and more people are simply using <em>cache</em>, and it's the suggested name. If you wish to use regional names, you can use something along the lines of <em>region.cache.domain.example</em>.
+</p>
+
+<p>Your choice of port has already been discussed. Have a look at <em>HTTP:port</em> in the index for more information.
+</p>
+
+<h4>Windows clients</h4>
+<p>See http://www.squid-cache.org/Doc/FAQ/FAQ-5.html for more information on configuring the different windows browsers.
+</p>
+
+<h4>Unix clients</h4>
+<p>Most Unix client programs use a single environment variable to decide how they are to access the Internet. If you run lynx (a terminal-based browser) on any of your machines, or use the recursive web-spider wget, you can simply set a shell variable and these programs will use the correct proxy server.
+</p>
+
+<p>Each protocol has a different environmental variable, so that you can configure your client to use a different proxy for each protocol. Each protocol simply has the text <em>_proxy</em> tagged onto the end, so some of the most common protocols end up as follows:
+</p>
+<ul>
+<li>http_proxy</li>
+<li>ftp_proxy</li>
+<li>gopher_proxy</li>
+</ul>
+
+<p>Since many people prefer a shell other than bash, we make an exception to our rule that "all examples are based on sh" here.
+</p>
+
+<h2>Browser-cache Interaction</h2>
+<p>The Internet is a transient place, and at some stage a server that does not correctly handle caching will be found. You can easily add the server to the appropriate <em>do not cache</em> lists, but most browsers give users a way of forcing a web page reload.
+</p>
+
+<h2>Testing the Cache</h2>
+<p>As you can see, pressing reload in Netscape (and some other browsers) doesn't simply re-fetch the page, it forces the cache not to serve the cached page. Many people doing tests of how the cache increases performance simply press reload, and believe that there has been no change in speed. The cache is, in fact, re-downloading the page from the origin server, so a speed increase is impossible.
+</p>
+
+<p>To test the cache properly you need two machines setup to access the cache, and a page that does not contain <em>do not cache me</em> headers. Pages that use ASP often include headers that force Squid not to cache the page, even if the authors are not aware of it's implications.
+</p>
+
+<p>So, to test the cache, choose a site that is off your local network (for a marked change, choose one in a different country) and access it from the first machine. Once it has download, change to the second machine and re-download the page. Once the page has downloaded there, check that the page is marked as a 'HIT' (in the file called <em>access.log</em>- the basics of which are covered earlier in this book). If the second accesses were marked as misses, it is probably because the origin server is asking Squid not to cache the page. Try a different page and see difference the cache makes to browsing speed.
+</p>
+
+<p>Many people are looking for an increase in performance on problem pages, since this is when people believe that they are getting the short end of the stick. If you choose a site that is too close, you may only be able to see a difference in the speed in the transaction-time field of the <em>access.log</em>.
+</p>
+
+<p>Since you have a completely unloaded cache, you should access a local, unloaded web server a few times, and see what kind of latency you experience with the cache. If you have time, print out some of the access log entries. If, some time in the future, you are unsure as to the cache load, you can compare the latency added now to the latency added by the same cache later on; if there is a difference you know it's time to upgrade the cache.
+</p>
+
+<h2>Cache Auto-config</h2>
+<p>Client browsers can have all options configured manually, or they can be configured to download a autoconfig file (every time they start up), which provides all of the information about your cache setup.
+</p>
+
+<p>Each URL referenced (be it the URL that you typed, or the URL for a graphic on the page yet to be retrieved) is checked against the list of rules. You should keep the list of rules as short as possible, otherwise you could end up slowing down page loads - not at the cache level, but at the browser.
+</p>
+
+<h3>Web server config changes for autoconfig files</h3>
+
+<p>The original <a href='http://home.netscape.com/eng/mozilla/2.0/relnotes/demo/proxy-live.html'>Netscape Proxy Auto Config documentation</a> script suggested the filename <em>proxy.pac</em> for Proxy AutoConfig files. Since it's possible to have a file ending in <em>.pac</em> that is not used for autoconfiguration, browsers require a server returning an autoconfig file to indicate so in the mime type. Most web servers do not automatically recognize the <em>.pac</em> extension as a proxy-autoconfig file, and have to be reconfigured to return the correct mime type (<em>application/x-ns-proxy-autoconfig</em>).
+</p>
+
+<h4>Apache</h4>
+
+<p>On some systems Apache already defines the autoconfig mime type. The Apache config file <em>mime.types</em> is used to associate filename extensions with mime types. This file is normally stored in the apache <em>conf</em> directory. This directory also contains the <em>access.conf</em> and <em>httpd.conf</em> files, which you may be more familiar with editing. As you can probably see, the <em>mime.types</em> file consists of two fields: a mime type on the left, the associated filename extension on the right. Since this file is only read at startup or reconfigure, you will need to send a <em>HUP</em> signal to the parent apache process for your changes to take affect. The following line should be added to the file, assuming that it is not already included:
+</p>
+<pre><code>
+application/x-ns-proxy-autoconfig pac
+</code></pre>
+
+<h4>Internet Information Server</h4>
+<p>FIX ME
+</p>
+
+<h4>Netscape</h4>
+<p>FIXME
+</p>
+
+<h3>Autoconfig Script Coding</h3>
+<p>The autoconfig file is actually a JavaScript with FindProxyForURL() function, put in a file and served by your standard web server program. Don't panic if you don't know JavaScript, since this section acts as a cookbook. Besides: the basic structure of the JavaScript language is quite easy to get the hang of, especially if you have previous programming experience, whether it be in C, Pascal or Perl.
+</p>
+
+<h4>The Hello World! of auto-configuration scripts</h4>
+<p>If you have learned a programming language, you probably remember one of the most basic programs simply printing the phrase <em>Hello World!</em>. We don't want to print anything when someone tries to go to a page, but the following example is similar to the original <em>Hello World</em> program in that it's the shortest piece of code that does something useful.
+</p>
+
+<p>The following simply connects direct to the origin server for every URL, just as it would if you had no proxy-cache configured at all.
+</p>
+<pre><code>
+function FindProxyForURL(url, host)
+{
+    return "DIRECT";
+}
+</code></pre>
+  
+The next example gets the browser to connect to the cache server named <em>cache.domain.example</em> on port <em>3128</em>. If the machine is down for some reason, an error message will be returned to the user.
+
+<pre><code>
+function FindProxyForURL(url, host)
+{
+    return "PROXY cache.domain.example:3128";
+}
+</code></pre>
+
+<p>As you may be able to guess from the above, returning text with a semicolon (<em>;</em>) splits the answer returned into two sub-strings. If the first cache server is unavailable, the second will be tried. This provides you with a failover mechanism: you can attempt a local proxy server first and, if it is down, try another proxy. If all are down, a direct attempt will be made. After a short period of time, the proxy will be retried.
+</p>
+
+<p>A third return type is included, for <em>SOCKS</em> proxies, and is in the same format as the HTTP type:
+</p>
+<pre><code>
+function FindProxyForURL(url, host)
+{ 
+    return "SOCKS socks.domain.example:3128";
+}
+</code></pre>
+
+<p>If you have no intranet, and require no exclusions, you should use the above autoconfig file. Configuring machines with above autoconfig file allows you to add future required exclusions very easily.
+</p>
+
+<h4>Auto-config functions</h4>
+<p>Web browsers include various built-in functions to make your autoconfig coding as simple as possible. You don't have to write the code that does a string match of the hostname, since you can use a standard function call to do a match. Not all functions are covered here, since some of them are very rarely used.
+</p>
+
+<h5>dnsDomainIs</h5>
+<p>Returns true if the first argument (normally specified as the variable host, which is defined in the autoconfig function by default) is in the domain specified in the second argument. Checks if a host is in a domain.
+</p>
+
+
+<p>You can check more than one domain by using the <em>||</em> JavaScript operator. Since this is a JavaScript operator you can use the layout described in this example in any combination.
+</p>
+
+
+<h5>isInNet</h5>
+<p>Sometimes you will wish to check if a host is in your local IP address range. To do this, the browser resolves the name to find the IP address. <em>Do not</em> use more than one isInNet call if you can help it: each call causes the browser to resolve the hostname all over again, which takes time. A string of these calls can reduce browser performance noticeably.
+</p>
+
+<p>The isInNet function takes three arguments: the hostname, and a subnet/netmask pair.
+</p>
+
+
+<h5>isPlainHostname</h5>
+<p>Simply checks that there is no full-stop in the hostname (the only argument for this call). Many people refer to local machines simply by hostname, since the resolver library will automatically attempt to look up <em>host.domain.example</em> if you simply attempt to connect to <em>host</em>. For example: typing <em>www</em> in your browser should bring up your web site.
+</p>
+
+<p>Many people connect to internal web servers (such as one sitting on their co-worker's desk) by typing in the hostname of the machine. These connections should not pass through the cache server, so many people use a function like the following:
+</p>
+
+<h5>myIpAddress</h5>
+<p>Returns the IP address of the machine that the browser is running on, requires no arguments.
+</p>
+
+<p>On a network with more than one cache, your script can use this information to decide which cache to communicate with. In the next subsection we look at different ways of communicating with a local proxy (with minimal manual user intervention), so the example here is comparatively basic. The below example assumes that you have more than two networks: one with a private address range (10.0.0.*), the others with real IP addresses.
+</p>
+
+<p>If the client machine is in the private address range, it cannot connect directly to the destination server, so if the cache is down for some reason they cannot access the Internet. A machine with a real IP address, on the other hand, should attempt to connect directly to the origin server if the cache is down. <!-- need to check it will work too! -->
+</p>
+
+<p>Since myIpAddress requires no arguments, we can simply place it in where we would have put <em>host</em> in the isInNet function call.
+</p>
+
+<h5>shExpMatch</h5>
+<p>The shExpMatch function accepts two arguments: a string and a shell expression. Shell expressions are similar to regular expressions, though are more limited. This function is often used to check if the url or host variables have a specific word in them.
+</p>
+
+<p>If you are configuring a ISP-wide script, this function can be quite useful. Since you do not know if a customer will call their machine "intranet" or "intra" or "admin", you can chain many shExpMatch checks together. Note that in the below example uses a single "intra*" shell expression to match both "intranet" and "intra.mydomain.example".
+</p>
+
+<h5>url.substring</h5>
+<p>This function doesn't take the same form as those described above. Since Squid does not support all possible protocols, you need a way of comparing the first few characters of the destination URL with the list of possible protocols. The function has two arguments. The first is a starting position, the second the number of characters to retrieve. Note that (like C), string start at position 0, rather than at 1.
+</p>
+
+<p>All of this is best demonstrated with an example. The following attempts to connect to the cache for the most common URL types (http, ftp and gopher), but attempts to go directly for protocols that Squid doesn't recognize.
+</p>
+
+
+<h4>Example autoconfig files</h4>
+<p>The main reason that autoconfig files were invented was the sheer number of possible cache setups. It's difficult (or even impossible) to represent all of the possible combinations that a autoconfig file can provide you with.
+</p>
+
+<p>There is no config file that will work for everyone, so a couple of config files are included here, one of which should suit your setup.
+</p>
+
+<h5>A Small Organization</h5>
+<p>A small organization is the easiest to create an autoconfig file for. Since you will have a moderately small number of IP addresses you can use the <em>isInNet</em> function to discover if the destination host is local or not (a large organization, such as an ISP would need a very long autoconfig file simply because they have many IP address ranges).
+</p>
+
+<h5>A Dialup ISP</h5>
+<p>Since dialup customers don't have intranet systems, a dialup ISP would have a very straight forward config file. If you wish your customers to connect directly to your web server (why waste the disk space of a cache when you have the origin server rack-mounted above it), you should use the dnsDomainIs function:
+</p>
+
+<h5>Leased Line ISP</h5>
+<p>When you are providing a public service, you have no control over what your customers call their machines. You have to handle the generic names (like intranet) and hope that people name their machines according to the de-facto standards.
+</p>
+
+<!-- I need some info on ieak - waiting for people here -->
+
+<h3>Super Proxy Script</h3>
+
+<p>Many large ISPs will have more than one cache server. To avoid duplicating objects, these cache servers have to communicate with one another. To find a local copy of the object, cache2 has to query the other caches. Add more and more caches, and your number of queries goes up.
+</p>
+
+<p>In the normal situation, cache1 gets a request for an object. It caches the page, and stores it on disk. An hour or so later, cache2 gets a request for the same object. It will then fetch the same data from the original site, while it would normally be quicker to get the date from cache1 located nearby.</p>
+
+
+<p>If an incoming request for a specific URL only ever went to one cache, your caches would not need to communicate with one another. A client requesting the page <em>http://www.qualica.com/</em> would always connect to cache1.
+</p>
+
+<p>Let's assume that you have 5 caches. Splitting the Internet into five pieces would split the load across the caches almost evenly. How do you split though <!-- By destination IP address? No, since IP's like 19?.*.*.* are much more common than "5.*.*.*". By domain? No again, since one domain like microsoft.com would mean that you were distributing load incorrectly. -->
+</p>
+
+<p>Some of you will know what a <em>hash function</em> is. If not, don't panic: you can still use the Super Proxy script without knowing the theoretical basis of the algorithms involved.
+</p>
+
+<p>The Super Proxy Script allows you to split up the Internet by URL (the combination of hostname, path and filename). If you have 5 cache servers, you split up the domain of possible answers into 5 parts. (A hash function returns a number, so we are using the appropriate terms - a domain is not an Internet domain in this context). With a good hashing function, the numbers returned are going to be spread across the 5 parts evenly, which spreads your load perfectly.
+</p>
+
+<p>If you have a cache which is twice as powerful as your others, you can allocate it more of the domain, and put more load on it.
+</p>
+
+<!-- Carp is used by some cache servers (most notably Microsoft Proxy and Squid) to decide which parent cache to send a request too. Browsers can also use CARP to decide which cache to talk to, using a java auto-config script. For more information (and an example Java script), you should look at the [http://naragw.sharp.co.jp/sps/ ] web page. -->
+
+<h2>cgi generated autoconfig files</h2>
+<p>It is possible to associate the <em>.pac</em> extension with a cgi program on most web servers. A program could then generate an autoconfig script depending on the source address of the request. Since the autoconfig file is only loaded on startup (or when the autoconfig refresh button is pressed) the slight delay due to a cgi program would not be noticeable to the user. Most large ISPs allocate subnets to regions, so a browser could be configured to access the nearest cache by looking at the source address of the request to the cgi program.
+</p>
+
+<h2>Future directions</h2>
+
+<p>There has recently been a move towards a standard for the automatic configuration of proxy-caches. New versions of Netscape and Internet Explorer are expected to use the new <em>unknown</em> standard to automatically change their proxy settings. This allows you to manipulate your cache server settings without inconveniencing clients.
+</p>
+
+<h3>Roaming</h3>
+<p>Roaming customers have to remove their configured caches, since your access control lists should stop them accessing your cache from another network.
+</p>
+
+<p>Although both problems can be reduced by the cgi-generated configs (discussed above) a firewall between the browser and your cgi server would still mean that roaming users cannot access the Internet.
+</p>
+
+<p>There are changes on the horizon that would help. As more and more protocols take roaming users into account, standards will evolve that make Internet usage plug-and-play. If you are in Tanzania today, plug in your modem and use the Internet. If you are in France in a weeks time, plug in again and (without config changes) you will be ready to go.
+</p>
+
+<p>Progress on standards for autoconfiguration of Internet applications is underway, which will allow administrators to specify config files depending on where a user connects from without something like the cgi kludge above.
+</p>
+
+<h3>Browsers</h3>
+<p>Browser support for CARP is not at the stage where it is tremendously useful: once there is a proper standard for setup, it's likely to be included into the main browsers.
+</p>
+
+<p>At some stage, expect support for ICP and cache-digests in browsers. The browser will then be able to make intelligent decisions as to which cache to talk to. Since ICP requests are efficient, a browser could send requests for each of the links on a page once it has retrieved the HTML source.
+</p>
+
+<h3>Transparency</h3>
+<p>Currently there is a major trend towards transparent caching, not only in the <em>"Outer Internet"</em>(where bandwidth is very expensive), but in the USA. (Transparency is covered in detail in chapter 12.)
+</p>
+
+<p>Transparency has one major advantage: Users do not have to configure their browsers to access the cache.
+</p>
+
+<p>To backbone providers this means that they can cache all passing traffic. A local ISP would configure their clients to talk to their cache; a backbone provider could then ask their ISP clients to use theirs as parents, but transparent caching has another advantage.
+</p>
+
+<p>A backbone provider is acting as transit for requests that originate on other backbone provider's networks. With transparency, a backbone provider reduces this traffic as well as requests from their network to other backbone providers.
+</p>
+
+<p>Assume you place a cache the hop before a major peering point. Here the cache intercepts both incoming requests (from other providers <em>to</em> web servers on your network) and outgoing (from your network <em>to</em> web servers on other provider's networks). This will reduce your peering-point usage (by caching outgoing requets for pages), and will also reduce the money you spend on other people's customers: since you reduce the cost it takes for data to flow <em>out</em> of your network. The latter cost may be minimal, but in times of network trouble it can reduce your latency noticibly.
+</p>
+
+<p>As more and more backbone providers cache pages, more local ISPs will cache ("since it's cached further along the path, we may as well implement caching here - it's not going to change anything"). Though this will probably cause a drop in the hit rate of the backbone providers, their ever increasing user-base may make up for it. Backbone providers are caching centrally - with large numbers of edge caches (local ISP caches), they are likely to see fewer hits. Certain Inter-University networks have already noticed such a hit rate decline. As more and more universities add local caches, their hit rate falls.
+</p>
+
+<p>Since the Universities are large, it's likely that their users will surf the same web page twice. Previously the Inter-University network would have returned the hit for that page, now the University's local cache does; this reduces the edge-cache's number of queries, and hence it's hit rate.
+</p>
+
+<h2>Ready to Go</h2>
+<p>If all has gone well, you should be ready to use your cache, at least on a trial basis. People around your office or division can now be configured to use the cache, and once you are happy with it's performance and stability, you can make it a proper service.
+</p>

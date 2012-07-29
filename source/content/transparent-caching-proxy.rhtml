@@ -1,0 +1,137 @@
+
+<h1>Transparent Caching</h1>
+
+<p>When you implement disk caching in an Operating System Kernel, all applications automatically see the benefit: the data caching happens without their knowledge. Since the Operating System ensures that on-disk copies of data are always the same as the cached copies, the data that an application reads is never out of date.
+</p>
+
+<p>With web caching, however, there is a chance that the original data can change without the cache knowing. Squid uses refresh patterns (described in chapter 11) to decide when cached objects are to be removed. If these rules are too aggressive, you could end up serving stale objects to clients. Even if these rules are perfect, an incorrectly configured source-server could get Squid to return old objects. Because users <em>could</em> retrieve an out of date page, you should not implement caching without their knowledge.
+</p>
+
+<p>Squid can be configured to act <em>transparently</em>. In this mode, clients will not configure their browsers to access the cache, but Squid will transparently pick up the appropriate packets and cache requests. This solves the biggest problem with caching: getting users to use the cache server. Users hardly ever know how to configure their browsers to use a cache, which means that support staff have to spend time with every user getting them to change their settings. Some users are worried about their privacy, or they think (that since it's a host between them and the Internet) that the cache is slower (certainly not the case, as a few tests with the <em>client</em> program will show).
+</p>
+
+<p>However: transparent caching isn't really transparent. The ''cache setup'' is transparent, but using the cache isn't. Users will notice a difference in error messages, and even the ''progress bars'' that browsers show can act differently.
+</p>
+
+<h2>The Problem with Transparency</h2>
+
+<p>When Squid transparently caches a site, the source IP address of the connection changes: the request comes from the cache server rather than the client machine. This can play havoc with web sites that use IP-address authentication (such sites only allow requests from a small set of IP addresses, rather than authenticating requests with a name and password.)
+</p>
+
+<p>Since the cache changes the source IP address of the connection, some servers may deny legitimate users access. In many cases, this will cost users money (they may pay for the service, or use the information on that site to make money.)
+</p>
+
+<p>If you know your network inside out, and know exactly who would be accessing a site like this, there is probably no problem with using transparent caching. If this is the case, though, it might be easier to simply change all of your users' settings.
+</p>
+
+<p>Dialup ISPs generally have little problem implementing transparent caching, since dialup customers almost always get a different IP address whenever they connect. Thus they cannot access sites which require a static IP address, so when requests start coming from the cache server there is no problem.
+</p>
+
+<p>ISPs which transparently cache leased-line customers are the most likely to have problems with IP-authenticating servers. If you are phasing transparency in for such an ISP, you must make sure that your customers know all the implications. They must know how to refresh pages (and who to tell if they find such out-of-date pages, so that the Squid refresh rules can be changed), and how the source IP address is going to change. You must <strong>not simply install the transparent cache and hope for the best!</strong>
+</p>
+
+<h2>The Transparent Caching Process</h2>
+<p>Let's look at what happens when you use transparency. First, though, you need to know something of what happens to IP packets at the ethernet level.
+</p>
+
+<h3>Some Routing Basics</h3>
+
+<p>An ethernet IP packet contains four addresses:
+</p>
+
+<ol>
+<li>The destination ''mac'' address. When a packet is transmitted down the ethernet wire, all ethernet cards on the network will check the destination mac address value. Each ethernet has a (supposedly) unique mac address. If the ethernet card's mac address matches the destination mac address of the packet, the ethernet card will pass the packet to the operating system, which will then deal with the contents of the packet.</li>
+<li>The source ''mac'' address: set by the sending ethernet card</li>
+<li>The destination IP address: set by the application sending the packet.</li>
+<li>The source ''IP'' address: set by the operating system of the ''source'' host (or, in some circumstances, the application on the source machine.) This value is not changed by routers along the way, routers re-forward the contents of the packet intact, and change only the destination mac addresses. If the source address was changed by each router, the routers would have to keep state of all the connections passing through it. This way, it can simply forward packets and forget about them.</li>
+</ol>
+
+<p>When a host wants to communicate with a machine that isn't on the local network, it uses a smart ''router'' to find the path to that network. When the client wants to send a packet ''through'' a router, the client sets the destination ''mac address'' of the packet to the router's interface, and sets the IP destination address to the required end host. It's important to know that the destination IP address of the packet isn't set to the router's IP address, only the ''mac'' address is changed. When a router accepts a packet, it decides which host to forward it to, based on it's routing tables. The router then sets the destination mac address of the packet to the next-hop router's ethernet address, and sends the packet to that machine. The remote host then repeats this process: if it's the destination machine, it uses the packet, but if it's another router, it will try and move the packet closer to it's final destination.
+</p>
+
+<h3>Packet Flow with Transparent Caches</h3>
+<p>Transparent caches essentially look out for TCP connections destined for port 80. The cache server will intercept these packets, convert them to a standard TCP ''stream'' and pass them to Squid. When Squid sends reply data to the client, the Operating System ''fakes'' the source address of the packets, so that the client believes it is connected to the server that it originally sent the request to.
+</p>
+
+<p>You can't simply plug a transparent cache into the network and get it to transparently cache pages. The cache server needs to be in a position where it can fake the reply packets (without the real server interrupting the conversation and confusing things.) The server needs to be the ''gateway'' to the outside world.
+</p>
+
+<p>Let's look at the simplest transparent cache setup. The client machine (10.0.0.50) treats the cache server's internal (10.0.0.1) interface as it's ''default gateway''. This way, all packets arrive on the cache server before they reach the rest of the Internet. The filter looks for port 80 packets, and passes them to Squid, but allows all other packets to be passed to the routing layer, which passes the packets to the router's IP (172.31.0.2).
+</p>
+
+<p>Once the connection is established, Squid needs to communicate with the client. Squid doesn't do any strange packet assembly: that's left to the transparency layer. When Squid sends reply data to the client, the kernel automatically changes the packet's from address, so it appears to the client that the server is just routing the requests from the outside world. When Squid connects to the remote server, however, the connect comes from the external interface of the cache server (172.31.0.1, in the example.) This is where IP-authentication breaks: since the request is coming from the cache (rather than the client's real address (10.0.0.50).
+</p>
+
+<p>Effectively, we need to get four things right to get transparency right:
+</p>
+<ol>
+<li>Correct network layout.</li>
+<li>Filtering out the appropriate packets.</li>
+<li>Kernel Transparency: redirecting port 80 connections to Squid.</li>
+<li>Squid settings. Squid needs to know that it's supposed to act in transparent mode.</li>
+</ol>
+
+<h2>Network Layout</h2>
+
+<p>For traffic to be filtered, all network traffic needs to pass through a ''filter device''. On smaller networks, the cache server can do the filtering (as it does in the above example network), but many people are now opting for secondary filter machines. These filter machines can be routers, Unix machines or even so-called ''layer four'' switches. These filtering machines allow for automatic failover (in case of cache failure) and load balancing. At the same time, the CPU load on the cache machine is vastly reduced: the CPU doesn't have to examine every passing packet ''and'' do caching.
+</p>
+
+<p>Sometimes, data is load-balanced across multiple Internet lines. You must ensure that all outgoing data is routed through the cache machine: the ougoing packets have to pass through the filter server, so if you are load-balancing outgoing traffic across more than one line, you may have to restructure your network so that packets pass through the filter server before they reach the outside world.
+</p>
+
+<h2>Filtering Traffic</h2>
+
+<p>Traffic filtering can now be done by numerous devices. A short time ago, only Unix servers (with special modifications) could sort traffic streams by destination port. These days, however, routers, switches and (of course) Unix machines can filter IP traffic.
+</p>
+
+<p>Which device you use to do your filtering depends on your load. For light loads, your cache server can do everything: the filtering, the redirection and the transparent caching. For heavier loads, you may want to use a seperate Unix machine, or you may want to get your router to filter the streams for you (only certain routers can do filtering fast at the hardware level: doing filtering on other routers will add additional load to the CPU). You could even get a so-called ''layer four switch'', which can do filtering at gigabit ethernet speeds.
+</p>
+
+<h3>Routers (not done)</h3>
+Not Done
+
+<h3>Layer-Four Switches (not done)</h3>
+Not Done
+
+<h3>Unix machines</h3>
+
+<p>Some Unix systems have built in support for filtering by destination TCP port. Since very few people do filter like this, many of the free Unix-like systems will need their kernel recompiled to include this functionality. Commercial systems may not support transparency, but if you are running a BSD-based system, you may be able to install the
+</p>
+
+<h4>FreeBSD</h4>
+<p>For FreeBSD add following lines and recompile kernel. By default ''''file'''' path is '''/usr/src/sys/i386/conf/''filename'''''
+<pre><code>
+  options         IPFIREWALL
+  options         IPFIREWALL_FORWARD
+  options         IPDIVERT
+</code></pre>
+
+<h4>Linux</h4>
+<pre><code>
+ iptables -t nat -A PREROUTING -p TCP --dport 80 -j REDIRECT --to-port 3128
+</code></pre>
+
+<h4>Ipfw</h4>
+<pre><code>
+/sbin/ipfw add 3 fwd 127.0.0.1,3128 tcp from any to any 80
+</code></pre>
+
+
+<h2>Squid Settings</h2>
+
+<p>For Squid 3 see <a href='http://www.lesismore.co.za/squid3.html'>Squid 3 Transparent Proxying with Linux Iptables</a> for more information.</p>
+
+<p>For squid = 2.6</p>
+<pre><code>
+ http_port 3128 transparent
+</code></pre>
+
+
+<p>For squid &lt; 2.6</p>
+<pre><code>
+ httpd_accel_port 80
+ httpd_accel_with_proxy on
+
+ httpd_accel_host virtual
+ httpd_accel_uses_host_header on
+</code></pre>

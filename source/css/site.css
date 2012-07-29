@@ -1,0 +1,24 @@
+/*
+  I really like the Dive Into HTML5 site readability at http://diveintohtml5.info/ so have based my structure on their
+  layout. It seems they have put a lot of thought into the word and paragraph spacing. That page is based on
+  a "CC-BY-3.0" licence. Thank you, diveintohtml5.info and Mark Pilgrim!
+*/
+body {
+  /* GFS+Didot is imported from Google fonts */
+  font: large/1.556em Palatino,"Palatino Linotype","GFS+Didot",Georgia,"Times New Roman",serif;
+  
+  margin: 0 auto;
+  max-width: 960px;
+  word-spacing: 0.1em;
+}
+p {
+  font-size: large;
+  margin: 1.556em 0;
+}
+h1 {
+  /* Capriola is imported from Google fonts */
+  font-family: 'Capriola', sans-serif;
+}
+div.page-header {
+  margin-top: 1.5em;
+}

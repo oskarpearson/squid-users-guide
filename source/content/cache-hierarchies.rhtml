@@ -1,0 +1,256 @@
+<h1>Introduction</h1>
+<p>Squid is particularly good at communicating with other caches and proxies. Numerous inter-cache communication protocols are supported, including ICP (Inter-Cache Protocol), Cache-Digests, HTCP (Hyper-Text Cache Protocol) and CARP (Cache Array Routing Protocol). Each of these protocols has specific strengths and weaknesses; they are more suited to some circumstances than others.
+</p>
+
+<p>In this chapter we look at each of the protocols in detail. We also look at the different ways that you can structure your cache hierarchy, and work through the config options that effect cache hierarchies.
+</p>
+
+<h1>Why Peer</h1>
+
+<p>The primary function of an inter-cache protocol is to stop object duplication, increasing hit rates. If you have a large network with widely separated caches, you may wish to store objects in each cache even if one of your other caches has it: by keeping objects close to your users, you reduce their network latency (even if you end up "wasting" disk space in the process.)
+</p>
+
+<p>Inter-branch traffic can be reduced by placing a cache at each branch. Since caches can avoid duplicating objects between them, each disk you add to a cache adds space to the overall hierarchy, increasing your hierarchy hit-rate. This is a lot better than simply having caches at branches which do not communicate with one another, since with that setup you end up with multiple copies of each cache object; one per server. Clients can also be configured to query another branch's cache if their local one goes down, adding redundancy.
+</p>
+
+<p>If overloaded, a central cache machine can become a network bottleneck. Unlike one cache machine, caches in a hierarchy can be close to all parts of the network; they can also handle a much larger load (with a near-linear increase in performance with each added machine). Loaded caches can thus be replaced with clusters of low-load caches, without wasting disk space.
+</p>
+
+<p>Integrating your caches into a public cache hierarchy can increase your hit rate (since you increase your effective disk space by accessing other machine's object stores.) By choosing peers carefully, you can reduce latency, or reduce costs by saving Internet bandwidth (if communicating with your peers is cheaper than going direct to the source.) On the other hand, communicating with peers via loaded (or high-latency) line can slow down your cache. It's best to check your peer response times periodically to check if the peering arrangement is beneficial. You can use the <em>client </em> program to check cache response times, and the cache manager (discussed in Chapter 12) to look at Squid's view on the cache.
+</p>
+
+<h1>Peer Configuration</h1>
+<p>First, let's look at the <em>squid.conf </em> options available for hierarchy configuration. We will then work through the most common hierarchy structures, so that you can see the way that the options are used.
+</p>
+
+<p>You use the <code class='squid-tag-inline'>cache_peer</code> option to configure the peers that Squid will communicate with. Other options are then used to select which peer to pass a request to.
+</p>
+
+<h2>The cache_peer Option</h2>
+<p>When communicating with a peer, Squid needs some basic information about how to talk to the machine; the hostname, what ports to send queries to, and so forth. The <code class='squid-tag-inline'>cache_peer</code> config line does this. Let's look at an example line:
+</p>
+
+<p>The <code class='squid-tag-inline'>cache_peer</code> option is split into five fields. The first field (<em>cache.domain.example</em>) is the hostname or IP of the cache that is to be queried. The second field indicates the type of relationship, and must be set to either <em>parent </em> or <em>sibling </em> or <em>multicast</em>. The third field sets the HTTP port of the destination server, while the fourth sets the ICP (UDP) query port. The fifth field can contain more than zero or more keywords, although we only use one in the example above; the keyword <em>default </em> sets that the cache will be used as the default path to the outside world. If you compiled Squid to support HTCP, your cache will automatically attempt to connect to TCP port <em>4827 </em>(there is currently no option to change this port value). Cache digests are transferred via the HTTP port specified on the <code class='squid-tag-inline'>cache_peer</code> line.
+</p>
+
+<p>Here is a summary of the available <code class='squid-tag-inline'>cache_peer</code> options:
+</p>
+
+<h1>Peer Selection</h1>
+<p>Let's say that you have only one parent cache server: the server at your ISP. In Chapter 3, we configured Squid so that the parent cache server would not be queried for internal hosts, so queries to the internal machines went direct, instead of adding needless load to your parent cache (and the line between you). Squid can use access-control lists to decide which cache to talk to, rather than just the destination domain. With access lists, you can use different caches depending on the source IP, domain, text in the URL and more. The advantages of this flexibility are not immediately obvious (even to me), but some examples are given in th remainder of this chapter. First, however, let's cover filtering by destination domain.
+</p>
+
+<h2>Selecting by Destination Domain</h2>
+<p>This tag is used to communicate with different caches depending on the domain that the request is destined for. To ensure that you don't query another cache server for your local domain, you can use the following config line:
+</p>
+
+<pre>
+cache_peer_domain cache-host.example.net !.my.dom.ain
+</pre>
+
+<h2>Selecting with Acls</h2>
+<p>Squid can also make peer selections based on the results of acl rules. The cache_peer_access line is discussed in the previous chapter. The following example could be used if you want all requests from a specific IP address range to go to a specific cache server (for accounting purposes, for example). In the following example, all requests from the 10.0.1.* range are passed to <em>cache.domain.example</em>, but all other requests are handled directly.
+</p>
+
+<h3>Querying an Adult-Site Filtering-cache for Specific URLs</h3>
+<p>Let's say that you have a separate Adult-Site cache, which filters out urls. The company that maintains the filter list charges by <em>number of queries</em>, so it's in your interest to bypass them for URLs that you know are fine. Their documentation says that you should set their machine up as your default parent, so you create a list of <em>suspect </em> words, and set the cache up to forward requests for any URL that contains one of these words to the filtering cache server. By avoiding the filtering server, you will end up missing a fairly large number of sites. At the same time, however, you don't end up filtering out valid sites that do contain suspect words in the URL.
+</p>
+
+<h3>Filtering with Cache Hierarchies</h3>
+<p>ISPs in the <em>outer regions </em> quite often peer with large hierarchies in the USA, so as to avoid any extra latency in the USA. Since it's almost certainly faster to get any local data directly from the source, they configure their caches to retrieve data for their local top-level domain directly, rather than via a USA cache.
+</p>
+
+<h3>The always_direct and never_direct tags</h3>
+<p>Squid checks all <code class='squid-tag-inline'>always_direct</code> tags before it checks any <code class='squid-tag-inline'>never_direct</code> tags. If a matching <code class='squid-tag-inline'>always_direct</code> tag is found, Squid will not check the <code class='squid-tag-inline'>never_direct</code> tags, but decides which cache to talk to immediately. This behavior is demonstrated by the following example; here, Squid will attempt to go the machine <em>intranet</em>, even though the same host is also matched by the <em>all </em> acl.
+</p>
+
+<p>Let's work through the logic that Squid uses in the above example, so that you can work out which cache Squid is going to talk to when you construct your own rules.
+</p>
+
+<p>First, let's consider a request destined for the web server <em>intranet.mydomain.example</em>. Squid first works through all the <code class='squid-tag-inline'>always_direct</code> lines; the request is matched by the first (and only) line. The <code class='squid-tag-inline'>never_direct</code> and <code class='squid-tag-inline'>always_direct</code> tags are acl-operators, which means that the first match is considered. In this illustration, the matching line instructs Squid to go directly when the acl matches, so all neighboring peers are ignored for this request. If the line used the <em>deny </em> keyword instead of <em>allow</em>, Squid would have simply skipped on to checking the <code class='squid-tag-inline'>never_direct</code> lines.
+</p>
+
+<p>Now, the second case: a request arrives for an external host. Squid works through the <code class='squid-tag-inline'>always_direct</code> lines, and finds that none of them match. The <code class='squid-tag-inline'>never_direct</code> lines are then checked. The <em>all </em> acl matches the connection, so Squid marks the connection as <em>never to be forwarded directly to the origin server</em>. Squid then works through it's list of peers, trying to find the cache that the request is best forwarded to (servers that have the object are more likely to get the request, as are servers that respond fast). The algorithm that Squid uses to decide which of it's peers to use is discussed shortly.
+</p>
+
+<h3>prefer_direct</h3>
+
+
+<h3>hierarchy_stoplist</h3>
+<p>Squid can be configured to avoid cache siblings when the requested URL contains specific word-lists. The <code class='squid-tag-inline'>hierarchy_stoplist</code> tag normally contains words that occur when the remote page is dynamically generated, such as <em>cgi-bin</em>, <em>asp </em> or more.
+</p>
+
+<h3>neighbor_type_domain</h3>
+<p>You can blur the distinction between peers and a siblings with this tag. Let's say that you work for a very large organization, with many regions, some in different countries.
+</p>
+
+<p>These organizations generally have their own network infrastructure: you will install a link to a local regional office, and they will run links to a core backbone. Let's assume that you work for the <em>regional </em> office, and you have an Internet line that your various divisions share. You also have a link to your head-office, where they have a large cache, and their own Internet link. You peer with their cache (with them set up as a sibling), and you also peer with your local ISP's server.
+</p>
+
+<p>When you request pages from the outside world, you treat your ISP's cache server as a parent, but when you query web servers in your own domain you want the requests to go to your head-office's cache, so that any web sites within your organization are cached. By using the <code class='squid-tag-inline'>neighbor_type_domain</code> option, you can specify that requests for your local domain are to be passed to your head-office's cache, but other requests are to be passed directly.
+</p>
+
+<h2>Other Peering Options</h2>
+<p>Various other options allow you to tune various values that effect your cache's interaction with hierarchies. These options all effect all peering caches (rather than individual machines).
+</p>
+
+<h3>miss_access</h3>
+<p>The <code class='squid-tag-inline'>miss_access</code> tag is an acl-operator. This tag has already been covered in the acls chapter (Chapter 6), but is covered here again for completeness. The <code class='squid-tag-inline'>miss_access</code> tag allows you to create a list of caches which are only allowed to retrieve <em>hits </em> from your cache. If they request an object that is missed, Squid will return an error page denying them access. If the example below is not immediately clear, please refer to Chapter 6 for more information
+</p>
+
+<h3>dead_peer_timeout</h3>
+<p>If a peer cache has not responded to an ICP request for <code class='squid-tag-inline'>dead_peer_timeout</code> seconds, the cache will be marked as down, and the object will be retrieved from somewhere else (probably directly from the source.)
+</p>
+
+<h3>icp_hit_stale</h3>
+<p>Turning this option on can cause problems if you peer with anyone.
+</p>
+
+<h1>Multicast Cache Communication</h1>
+<p>Cache digests are in some ways a replacement for multicast cache peering. There are some advantages to cache-digests: they are handled at the Squid level (so you don't have to fiddle with kernel multicast settings and so forth), and they add significantly less latency (finding out if a cache has an object simply involves checking an in-memory bit-array, which is significantly faster than checking across the network).
+</p>
+
+<p>First, though, let's cover some terminology. Most people are familiar with the term <em>broadcast</em>, where data is sent from one host to all hosts on the local network. Broadcasts are normally used to discover things, not for general inter-machine transfer: a machine will send out a broadcast ARP request to try and find the hardware address that a specific IP address belongs to. You can also send ping packets to the broadcast address, and find machines on the local network when they respond. Broadcasts only work across physical segments (or bridged/switched networks), so an ARP request doesn't go to every machine on the Internet.
+</p>
+
+<p>A <em>unicast </em> packet is the complete opposite: one machine is talking to only one other machine. All TCP connections are unicast, since they can only have one destination host for each source host. UDP packets are almost always unicast too, though they can be sent to the broadcast address so that they reach every single machine in some cases.
+</p>
+
+<p>A <em>multicast </em> packet is from one machine to one or more. The difference between a multicast packet and a broadcast packet is that hosts receiving multicast packets can be on different lans, and that each multicast data-stream is only transmitted between networks once, not once per machine on the remote network. Rather than each machine connecting to a video server, the multicast data is streamed per-network, and multiple machines just listen-in on the multicast data once it's on the network.
+</p>
+
+<p>This efficient use of bandwidth is perfect for large groups of caches. If you have more than one server (for load-distribution, say), and someone wants to peer with you, they will have to configure their server to send one ICP packet to each of your caches. If Squid gets an ICP request from somewhere, it doesn't check with all of it's peers to see if they have the object. This "check with my peers" behavior only happens when an HTTP request arrives. If you have 5 caches, anyone who wants to find out if your hierarchy has an object will have to send 5 ICP requests (or treat you as a parent, so that your caches check with one another). This is a real waste of bandwidth. With a multicast network, though, the remote cache would only send one ICP request, destined for your multicast address. Routers between you would only transfer one packet (instead of 5), saving the duplication of requests. Once on your network, each machine would pick up one packet, and reply with their answer.
+</p>
+
+<p>Multicast packets are also useful on local networks, if you have the right network cards. If you have a large group of caches on the same network, you can end up with a lot of local traffic. Each request that a cache receives prompts one ICP request to all the other local caches, swamping the local network with small packets (and their replies). A multicast packet, on the other hand, is a kind of <em>broadcast </em> to the machines on the local network. They will each receive a copy of the packet, although only one went out onto the wire. If you have a good ethernet card, the card will handle a fair amount of the filtering (some cards may have to be put into promiscuous mode to pick up all the packets, which can cause load on the machine: make sure that the card you buy supports hardware multicast filters). This solution is still not linearly scalable, however, since the reply packets can easily become the bottleneck by themselves.
+</p>
+
+<h2>Getting your machine ready for Multicast</h2>
+
+<p>The kernel's IP stack (the piece of kernel code that handles IP networking) needs to look out for multicast packets, otherwise they will be discarded (either by the network card or the lower levels of the IP stack.) Your kernel may already have multicast support, or you will have to turn it on. Doing this is, unfortunately, beyond the scope of this book, and you may have to root around for a howto guide somewhere.
+</p>
+
+<p>Once your machine is setup to receive multicast packets, you need your machines to talk to one another. You can either join the mbone (a virtual multicast backbone), or set up an internal multicast network. Joining the mbone could be a good thing anyway, since you get access to other services. You must be sure not to use a random set of multicast IP addresses, since they may belong to someone else. You can get your own IP range from the people at the mbone.
+</p>
+
+<p>An outgoing multicast packet has a <em>ttl </em>(Time To Live) value, which is used to ensure that loops are not created. Each time a packet passes through a router, the router decrements this ttl value, and the value is then checked. Once the value reaches zero, the packet is dropped. If you want multicast packets to stay on your local network, you would set the ttl value to 1. The first router to see the packet would decrement the packet, discover the ttl was zero and discard it. This value gives you a level of control on how many multicast routers will see the packet. You should set this value carefully, so that you limit packets to your local network or immediate multicast peers (larger multicast groups are seldom of any use: they generate too many responses, and when geographically dispersed, may simply add latency. You also don't want crackers picking up all your ICP requests by joining the appropriate multicast group.)
+</p>
+
+<p>Various multicast debugging tools are available. One of the most useful is <em>mtrace</em>, which is effectively a traceroute program for multicast connections. This program should help you choose the right ttl value.
+</p>
+
+<h2>Querying a Multicast Cache</h2>
+<p>The <code class='squid-tag-inline'>cache_peer</code> option traditionally can have two types of cache: a <em>parent </em> and a <em>sibling</em>. If you are querying a set or multicast caches, you need to use a different tag, the <em>multicast </em> cache type. When you send a multicast request to a cache, each of the servers in the group will send you a response packet (from their <em>real </em> IP address.) Squid discards unexpected ICP responses by default, and since it can't determine which ICP replies are valid automatically, you will have to add lines to the Squid config file that stop it rejecting packets from hosts in the multicast group.
+</p>
+
+<p>In the following example, the multicast group <em>224.0.1.20 </em> consists of three hosts, at IP addresses <em>10.11.12.1</em>, <em>10.11.13.1 </em> and <em>10.11.14.1</em>. These hosts are quite close to your cache, so the <em>ttl </em> value is set to 5.
+</p>
+
+<h2>Accepting Multicast Queries: The mcast_groups option</h2>
+
+<p>As a multicast server, Squid needs to listen out for the right packets. Since you can have more than one multicast group on a network, you need to configure Squid to listen to the right multicast-group (the IP that you have allocated to Squid.) The following (very simple) example is from the config of the server machine <em>10.11.12.1 </em> in the example above.
+</p>
+
+<h2>Other Multicast Cache Options</h2>
+<h3>The mcast_icp_query_timeout Option</h3>
+
+<p>As you may recall, Squid will wait for up to <code class='squid-tag-inline'>dead_peer_timeout</code> seconds after sending out an ICP request before deciding to ignore a peer. With a multicast group, peers can leave and join at will, and it should make no difference to a client. This presents a problem for Squid: it can't wait for a number of seconds each time (what if the caches are on the same network, and responses come back in milliseconds: the waiting just adds latency.) Squid gets around this problem by sending ICP <em>probes </em> to the multicast address occasionally. Each host in the group responds to the probe, and Squid will know how many machines are currently in the group. When sending a real request, Squid will wait until it gets at least as many responses as were returned in the last probe: if more arrive, great. If less arrive, though, Squid will wait until the <code class='squid-tag-inline'>dead_peer_timeout</code> value is reached. If there is still no reply, Squid marks that peer as down, so that all connections are not held up by one peer.
+</p>
+
+<p>When Squid sends out a multicast query, it will wait at most <code class='squid-tag-inline'>mcast_icp_query_timeout</code> seconds (it's perfectly possible that one day a peer will be on the moon: and it would probably be a bad idea to peer with that cache seriously, unless it was a parent for the Mars top-level domain.) It's unlikely that you will want to increase this value, but you may wish to drop it, so that only reasonably speedy replies are considered.
+</p>
+
+<h1>Cache Digests</h1>
+<p>Cache digests are one of the latest peering developments. Currently they are only supported by Squid, and they have to be turned on at compile time.
+</p>
+
+<p>Squid keeps it's "list" of objects in an in-memory hash. The hash table (which is based on MD5) helps Squid find out if an object is in the cache without using huge amounts of memory or reading files on disk. Periodically Squid takes this table of objects and summarizes it into a small bitmap (suitable for transfer across a modem). If a bit in the map is on, it means that the object is in the store, if it's off, the object is not. This bitmap/summary is available to other caches, which connect on the HTTP port and request a special URL. If the client cache (the one that just collected the bitmap) wants to know if the server has an object, it simply performs the same mathematical function that generated the values in the bitmap. If the server has the object, the appropriate bit in the bitmap will be defined.
+</p>
+
+<p>There are various advantages to this idea: if you have a set of loaded caches, you will find that inter-cache communication can use significant amounts of bandwidth. Each request to one cache sparks off a series of requests to all neighboring caches. Each of these queries also causes some server load: the networking stack has to deal with these extra packets, for one thing. With cache-digests, however, load is reduced. The cache digest is generated only once every 10 minutes (the exact value is tunable). The transfer of the digest thus happens fairly seldom, even if the bitmap is rather large (a few 100kbytes is common.) If you were to run 10 caches on the same physical network, however, with each ICP request being a few hundred bytes, the numbers add up. This network load reduction can give your cache time to breathe too, since the kernel will not have to deal with as many small packets.
+</p>
+
+<p>ICP packets are incredibly simple: they essentially contain only the requested URL. Today, however, a lot of data is transferred in the headers of a request. The contents of a static URL may differ depending on the browser that a user uses, cookie values and more. Since the ICP packet only contains the URL, Squid can only check the URL to see if it has the object, not both the headers and the URL. This can (very occasionally) cause strange problems, with the wrong pages being served. With cache digests, however, the bitmap value depends on both the headers AND the url, which stops these strange hits of objects that are actually generated on-the-fly (normally these pages contain <em>cgi-bin </em> in their path, but some don't, and cause problems.)
+</p>
+
+<p>Cache digests can generate a small percentage of false hits: since the list of objects is updated only every 10 minutes, your cache could expire an object a second after you download the summarized index. For the next ten minutes, the client cache would believe your server has data that it doesn't. Some five percent of hits may be false, but they are simply retrieved directly from the origin server if this turns out to be the case.
+</p>
+
+<h1>Cache Hierarchy Structures</h1>
+<p>Deciding what hierarchy structure to use is difficult. Not only that, but it's quite often very difficult to change, since you can have thousands of clients accessing you directly, and even more through your peers.
+</p>
+
+<p>Here, I cover the most common cache-peer architectures. We start off with the most simple setup that's considered peering: two caches talking to one another as siblings. I am going to try and cover all the issues with this simple setup, and then move to larger cache meshes.
+</p>
+
+<h2>Two Peering Caches</h2>
+<p>We have two caches, your cache and their cache. You have a nice fast link between them, with low-latency, both caches have quite a lot of disk space, and they aren't going to be running into problems with load anytime soon. Let's look at the peering options you have:
+</p>
+
+<h3>Things to Watch Out For</h3>
+<p>The most common problem with this kind of setup is the "continuous object exchange". Let's say that your cache has an object. A user of their cache wants the object, so they retrieve it from you. A few hours later you expire the object. The next day, one of your users requests the object. Your cache checks with the other cache and finds that it does, indeed, have the object (it doesn't realize that it was the one that retrieved the object in the first place). It retrieves the object. Later on the whole process repeats itself, with their cache getting the object from you again. To stop this from happening, you may have to use the <code class='squid-tag-option-inline'>proxy-only</code> option to the <code class='squid-tag-inline'>cache_peer</code> line on both caches. This way, the caches simply retrieve their data from the fast sibling cache each time: if that cache expires the object, the object cannot return from the other cache, since it was never saved there.
+</p>
+
+<p>With ICP, there is a chance that an object that is <em>hit </em> is dynamically generated (even if the path does not say so). Cache digests fix this problem, which may make their extra bandwidth usage worthwhile.
+</p>
+
+<h2>Trees</h2>
+<p>The traditional cache hierarchy structure involves lots of small servers (with their own disk space, each holding the most common objects) which query another set of large parent servers (there can even be only one large server.) These large servers then query the outside on the client cache's behalf. The large servers keep a copy of the object so that other internal caches requesting the page get it from them. Generally, the little servers have a small amount of disk space, and are connected to the large servers by quite small lines.
+</p>
+
+<p>This structure generally works well, as long as you can stop the top-level servers from becoming overloaded. If these machines have problems, all performance will suffer.
+</p>
+
+<p>Client caches generally do not talk to one another at all. The parent cache server should have any object that the lower-down cache may have (since it fetched the object on behalf of the lower-down cache). It's invariably faster to communicate with the head-office (where the core servers would be situated) than another region (where another sibling cache is kept).
+</p>
+
+<p>In this case, the smaller servers may as well treat the core servers as <em>default </em> parents, even using the <code class='squid-tag-option-inline'>no-query</code> option, to reduce cache latency. If the head-office is unreachable it's quite likely that things may be unusable altogether (if, on the other hand, your regional offices have their own Internet lines, you can configure the cache as a normal parent: this way Squid will detect that the core servers are down, and try to go direct. If you each have your own Internet link, though, there may not be a reason to use a tree structure. You might want to look at the <em>mesh </em> section instead, which follows shortly.)
+</p>
+
+<p>To avoid overloading one server, you can use the <code class='squid-tag-option-inline'>round-robin</code> option on the <code class='squid-tag-inline'>cache_peer</code> lines for each core server. This way, the load on each machine should be spread evenly.
+</p>
+
+<h2>Meshes</h2>
+<p>Large hierarchies generally use either a <em>tree </em> structure, or they are <em>true meshes</em>. A true mesh considers all machines equal: there is no set of large root machines, mainly since they are almost <em>all </em> large machines. Multicast ICP and Cache digests allow large meshes to scale well, but some meshes have been around for a long time, and are only using vanilla ICP.
+</p>
+
+<p>Cache digests seem to be the best for large mesh setups these days: they involve bulk data transfer, but as the average mesh size increases machines will have to be more and more powerful to deal with the number of queries coming in. Instead of trying to deal with so many small packets, it is almost certainly better to do a larger transfer every 10 minutes. This way, machines only have to check their local ram to see which machines have the object.
+</p>
+
+<p>Pure multicast cache meshes are another alternative: unfortunately there are still many reply packets generated, but it still effectively halves the number of packets flung around the network.
+</p>
+<h2>Load Balancing Servers</h2>
+<p>Sometimes, a single server cannot handle the load required. DNS or CARP load balancing will allow you to split the load between two (or more) machines.
+</p>
+
+<p>DNS load balancing is the simplest option: In your DNS file, you simply add <em>two </em> A records for the cache's hostname (you did use a hostname for the cache when you configured all those thousands of browsers like I told you, right?) The order that the DNS server returns the names in is continuously, randomly switched, and the client requesting the lookup will connect to a random server. These server machines can be setup to communicate with one-another as peers. By using the <code class='squid-tag-option-inline'>proxy-only</code> option, you reduce duplication of objects between the machines, saving disk space (and, hopefully, increasing your hit rate.)
+</p>
+
+<p>There are other load-balancing options. If you have client <em>caches </em> accessing the overloaded server (rather than client <em>pcs</em>), you can configure Squid on these machines with the <code class='squid-tag-option-inline'>round-robin</code> option on the <code class='squid-tag-inline'>cache_peer</code> lines. You could also use the <em>CARP </em>(Cache Array Routing Protocol) to split the load unevenly (if you have one very powerful machine and two less powerful machines, you can use CARP to load the fast cache twice as much as the other machines).
+</p>
+
+<h1>The Cache Array Routing Protocol (CARP)</h1>
+
+<p>The CARP protocol uses a <em>hash function </em> to decide which cache a request is to be forwarded to. When a request is to be sent out, the code takes the URL requested and feeds it through a formula that essentially generates a large number from the text of the URL. A different URL (even if it differs by only one character) is likely to end up as a very different number (it won't, for example, differ by one). If you take 50 URLs and put them through the function, the numbers generated are going to be spread far apart from one another, and would be spread evenly across a graph. The numbers generated, however, all fit in a certain range. Because the number are spread across the range evenly, we can split the range into two, and the same number of URLs will have ended up in the first half as the second.
+</p>
+
+<p>Let's say that we create a rule that effectively says: "I have two caches. Whenever I receive a request, I want to pass it to one of these caches. I know that any number generated by the hash function will be less than X, and that numbers are as likely to fall above one-half X as below. By sending all requests that hash to less than one-half X to cache one, and the remaining requests to cache two, the load should be even."
+</p>
+
+<p>To terminology: the total range of numbers is split into equally large number ranges (called buckets).
+</p>
+
+<p>Let's say that we have two caches, again. This time, though, cache one is able to handle twice the load of cache two. If we split the hash space into three ranges, and allocate buckets one and three to cache one (and bucket two to cache two), a URL will have twice the chance of going to cache one as it does to cache two.
+</p>
+
+<p>Squid caches can talk to <em>parent</em> caches using CARP balancing if CARP was enabled when the source was configured (using the <em>./configure --enable-carp </em> command.)
+</p>
+
+<p>The load-factor values on all cache_peer lines must add up to 1.0. The below example splits 70% of the load onto the machine <em>bigcache.mydomain.example</em>, leaving the other 30% up to the other cache.
+</p>
+
+<p>Now that your cache is integrated into a hierarchy (or is a hierarchy!), we can move to the next section. Accelerator mode allows your cache to function as a <em>front-end </em> for a real web server, speeding up web page access on those old servers.
+</p>
+
+<p>Transparent caches effectively accelerate web servers from a distance (the code, at least, to perform both functions is effectively the same.) If you are going to do transparent proxying, I suggest that you read the next two Chapters. If you aren't interested in either of these Squid features, your Squid installation should be up and running. The remainder of the book (Section III) covers cache maintenance and debugging.
+</p>

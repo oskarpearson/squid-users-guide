@@ -1,0 +1,159 @@
+<h1>Note</h1>
+<p>NOTE: This information is outdated as of 2.6.
+</p>
+
+<h1>Accelerator Mode</h1>
+<p>Some cache servers can act as web servers (or vice versa). These servers accept requests in both the standard web-request format (where only the path and filename are given), and in the proxy-specific format (where the entire URL is given).
+</p>
+
+<p>The Squid designers have decided not to let Squid be configured in this way. This avoids various complicated issues, and reduces code complexity, making Squid more reliable. All in all, Squid is a web cache, not a web server.
+</p>
+
+<p>By adding a <em>translation</em> layer into Squid, we can accept (and understand) web requests, since the format is essentially the same. The additional layer can re-write incoming web requests, changing the destination server and port. This re-written request is then treated as a normal request: the remote server is contacted, the data requested and the results cached. This lets you get Squid to pretend to be a web server, re-writing requests so that they are passed on to some other web server.
+</p>
+
+<h2>When to use Accelerator Mode</h2>
+<p>Accelerator mode should not be enabled unless you need it. There are a limited set of circumstances in which it is needed, so if one of the following setups applies to you, you should have a look at the remainder of this chapter.
+</p>
+
+
+<h3>Acceleration of a slow server</h3>
+<p>Squid can sit in front of a slow server, caching the server's results and passing the data on to clients. This is very useful when the origin server (the server that is actually serving the original data) is very slow, or is across a slow line). If the origin server is across a slow line, you could just move the origin server closer to the clients, but this may not be possible for administrative reasons. Don't use Squid to cache web server on the same machine for speed up, since modern web server (e.g. httpd) is faster than Squid in serving static contents in most cases.
+</p>
+
+<h3>Replacing a combination cache/web server with Squid</h3>
+<p>If you are in the process of replacing a combination cache/web server, your client machines may be configured to talk to the cache on port 80. Rather than reconfiguring all of you clients, you can get Squid to listen for incoming connections on port 80 (moving the real server to another port or server.) When Squid finds that it's received a web request, it will forward the request to the origin server, so that the machine continues to function as both a web and cache server.
+</p>
+
+<h3>Transparent Caching/Proxy</h3>
+<p>Squid can be configured to <em>magically</em> intercept outgoing web requests and cache them. Since the outgoing requests are in web-server format, it needs to translate them to cache-format requests. Transparent caching is covered in detail in the following section.
+</p>
+
+<h3>Security</h3>
+<p>Squid can be placed in front of an insecure web server to protect it from the outside world: not merely to stop unwanted clients from accessing the machine, but also to stop people from exploiting bugs in the server code.
+</p>
+
+<h2>Accelerator Configuration Options</h2>
+<p><strong>Please note as of Squid 2.6 these options have been replaced with parameters that are stated in the <code class='squid-tag-inline'>http_port</code> section of the squid.conf file. Their use in Squid 2.6 has been deprecated, please read below for their replacements.</strong>
+</p>
+
+<p>The list of accelerator options is short, and setup is fairly simple. Once we have a working accelerator cache, you will have to create the appropriate access-list rules. (Since you probably want people outside your local network to be able to access your server, you cannot simple use source-IP address rulesets anymore.)
+</p>
+
+<h3>The httpd_accel_host option</h3>
+<p>You will need to set the hostname of the accelerated server here. It's only possible to have one destination server, so you can only have one occurence of this line. If you are going accelerate more than one server, or transparently cache traffic (as described in the next chapter), you will have to use the word <em>virtual</em> instead of a hostname here.
+</p>
+
+<h3>The httpd_accel_port option</h3>
+
+<p>Accelerated requests can only be forwarded to one port: there is no table that associates accelerated hosts and a destination port. Squid will connect to the port that you set the <code class='squid-tag-inline'>httpd_accel_port</code> value to. When acting as a front-end for a web server on the local machine, you will set up the web server to listen for connections on a different port (8000, for example), and set this squid.conf option to match the same value. If, on the other hand, you are forwarding requests to a set of slow backend servers, they will almost certainly be listening to port 80 (the default web-server port), and this option will need to be set to 80.
+</p>
+
+<h3>The httpd_accel_with_proxy option</h3>
+<p>If you use the <code class='squid-tag-inline'>httpd_accel_host</code> option, Squid will stop recognizing <em>cache</em> requests. So that your cache can function both as an accelerator and as a web cache, you will need to set the <code class='squid-tag-inline'>httpd_accel_with_proxy</code> option to <em>on</em>.
+</p>
+
+<h3>The httpd_accel_uses_host_header option</h3>
+<p>A normal HTTP request consists of three values: the type of transfer (normally a GET, which is used for downloads); the path and filename to be retrieved (or executed, in the case of a cgi program); and the HTTP version.
+</p>
+
+<p>This layout is fine if you only have one web site on a machine. On systems where you have more than one site, though, it makes life difficult: the request does not contain enough information, since it doesn't include information about the destination domain. Most operating systems allow you to have <em>IP aliases</em>, where you have more than one IP address per network card. By allocating one IP per hosted site, you could run one web server per IP address. Once the programs were made more efficient, one running program could act as a server for many sites: the only requirement was that you had one IP address per domain. Server programs would find out which of the IP addresses clients were connected to, and would serve data from different directories for each IP.
+</p>
+
+
+<p>There are a limited number of IP addresses, and they are fast running out. Some systems also have a limited number of IP aliases, which means that you cannot host more than a (fairly arbitrary) number of web sites on machine. If the client were to pass the destination host name along with the path and filename, the web server could listen to only one IP address, and would find the right destination directores by looking in a simple hostname table.
+</p>
+
+
+<p>From version 1.1 on, the HTTP standard requires a special <em>Host</em> header, which is passed along with every outgoing request. This header also makes transparent caching and acceleration easier: by pulling the host value out of the headers, Squid can translate a standard HTTP request to a cache-specific HTTP request, which can then be handled by the standard Squid code. Turning on the <code class='squid-tag-inline'>httpd_accel_uses_host_header</code> option enables this translation. You will need to use this option when doing transparent caching.
+</p>
+
+<p>It's important to note that acls are checked <em>before</em> this translation. You must combine this option with strict source-address checks, so you cannot use this option to accelerate multiple backend servers (this is certain to change in a later version of Squid).
+</p>
+
+<h3>Option replacements in Squid 2.6</h3>
+
+<p>In this part of the Squid documentation only the option replacements and their correlation with the now deprecated options shall be listed, please refer to the text above as to what each option does. Please note that much of this is taken directly from the Squid 2.6 Changes document. Most setup migration from 2.5 to 2.6 should start rewriting this part of the configuration from scratch as per <a href='http://wiki.squid-cache.org/SquidFaq/ReverseProxy'>Squid Reverse Proxy</a>.
+</p>
+
+<h4>httpd_accel_* for transparent proxy</h4>
+<p>This has all been replaced by a parameter called <em>transparent</em> that acheives this, please refer to the section on Transparent Proxy/Cache for more information
+</p>
+
+<h4>httpd_accel_host</h4>
+<p>Replaced by defaultsite http_port option and cache_peer originserver option.
+</p>
+
+<h4>httpd_accel_port</h4>
+<p>No longer needed. Server port defined by the cache_peer port.
+</p>
+
+<h4>httpd_accel_uses_host_header</h4>
+<p>Replaced by vhost http_port option
+</p>
+
+<h4>Squid Version 2.6</h4>
+
+<p>Enable transparent mode:</p>
+<pre><code>
+http_port 3128 transparent
+</code></pre>
+
+<p>You'll need to locate the proper place and add this line:</p>
+<pre><code>
+always_direct allow all
+</code></pre>
+
+<p>Configuration for acceleration of a backend host</p>
+<pre><code>
+       http_port 80 defaultsite=backEndIpAddressHere
+       acl port80 port 80
+       http_access allow port80
+       always_direct allow all
+</code></pre>
+
+<h2>Related Configuration Options</h2>
+So far, we have only covered the Config options that directly relate to accelerator mode.
+
+<h3>The redirect_rewrites_host_header option</h3>
+<h3>Refresh patterns</h3>
+
+<p>Accelerating a slow web server is only useful if the cache can keep copies of returned pages (so that it can avoid contacting the back-end server.) Since you know about the backend server, you can specify refresh patterns that suit the machine exactly. Refresh patterns aren't covered here (they are covered in-depth in Chapter 11), but it's worth looking at how your site changes, and tuning your refresh patterns to match.
+</p>
+
+<p>If, on the other hand, you are using simply using accelerator mode to replace a combination cache (or to act as a secure front-end for another server), you can disable caching of that site altogether: otherwise you simply end up duplicating data (once on the origin site, once for the cached copy) with no benefit.
+</p>
+
+<h3>Access Control</h3>
+
+<p>Presumably you will want people from outside your network to be able to access the web server that Squid is accelerating. If you have based your access lists on the examples in this book, you will find that machines on the outside cannot access the site being accelerated. The accelerated request is treated exactly like a normal http request, so people accesing the site from the outside world will be rejected since your acl rules deny access from IPs that are not on your network. By using the <em>dst</em> acl type, you can add specific exclusions to your access lists to allow requests to the accelerated host.
+</p>
+
+<p>In the following example, we have changed the config so that the first rule matches (and allows) any request to the machine at IP 10.0.0.5, the accelerated machine. If we did not have the <em>port</em> acl in the below rules, someone could request a URL with a different port number with a request that explicitly specifies a non-standard port. If we were to leave out this rule, it could let a system cracker poke around the system with requests for things like <em>http://server.mydomain.example:25</em>.
+</p>
+
+<h2>Example Configurations</h2>
+<p>Let's cover two example setups: one, where you are simply using Squid's accelerator function so that the machine has both a web server and a cache server on port 80; two, where you are using Squid as an accelerator to speed up a slow machine.
+</p>
+
+<h3>Accelerating Requests to a Slow Server</h3>
+<p>When accelerating a slow server, you may find that communicating with peer caches is faster than communicating with the accelerated host. In the following example, we remove all the options that stop Squid from caching the server's results. We also assume that the accelerated host is listening on port 80, since there is no conflict with Squid trying to listen to the same port.	 
+</p>
+
+<p>Once you have tested that connecting to Squid brings up the correct pages, you will have to change the DNS entry to point to your cache server..
+</p>
+
+<h3>Replacing a Combination Web/Cache server</h3>
+
+<p>First, let's cover the most common use of <em>accelerator mode</em>: replacing a combination web/cache server with Squid. When Squid is acting as an accelerator (speeding up a slow web server), Squid will accept requests on port 80 (on any IP address) and pass them to a cache server on a different machine (also on port 80). Since it's unlikely that you want to use two machines where you can use one (unless you are changing to Squid due to server overload), we will need to configure Squid to pass requests to the local machine.	 
+</p>
+
+<p>Squid will need to accept incoming requests on port 80 (using the <code class='squid-tag-inline'>http_port</code> option), and pass the requests on to the web server on another port (since only one process can listen for requests on port 80 at a time). I normally get web servers to listen for requests on port <em>8000</em>.	 
+</p>
+
+<p>Since you want Squid to function both as an accelerator and as a cache server, you will need to use the <code class='squid-tag-inline'>httpd_accel_with_proxy</code> option.	 
+</p>
+
+<p>The cache in this example is the local machine: there is almost certainly no reason to cache results from this server. I could have used an extremely conservative <code class='squid-tag-inline'>refresh_pattern</code> in the below example, but instead I decide to use the <code class='squid-tag-inline'>no_cache</code> tag: this way I can make use of my predefined acl. The <code class='squid-tag-inline'>always_direct</code> tag in the below example will be very useful if you have a peer cache: you don't want the request passed on to a peer machine.
+
+</p>

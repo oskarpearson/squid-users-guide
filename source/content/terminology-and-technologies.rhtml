@@ -1,0 +1,208 @@
+<!-- 
+This section was written ages ago, however it was somehow lost during the process of translating from SGML to XML to wiki.
+
+The recent spate of requests like "What does squid do?" and "Can I use squid to replace IAS", made me search for this as a reference on the wiki, and I then realised that something had been lost. Oskar
+-->
+
+<h1>Terminology and technology</h1>
+
+
+<h2>What is squid?</h2>
+
+<p>Squid is a very fast proxy-cache program.  But what is a "proxy cache"?
+According to Project Gutenberg's Online version of Webster's Unabridged Dictionary:
+</p>
+
+<dl>
+  <dt><dfn>Proxy</dfn><dt><dd>An agent that has authority to act for another.</dd>
+  <dt><dfn>Cache</dfn></dt><dd>A hiding place for concealing and preserving provisions which it is inconvenient to carry.</dd>
+</dl>
+
+<p>Squid acts as an agent, accepting requests from clients (such as browsers) and passes them to the appropriate Internet server. It stores a copy of the returned data in an on-disk cache. The real benefit of Squid emerges when the same data is requested multiple times, since a copy of the on-disk data is returned to the client, speeding up Internet access and saving bandwidth. Small amounts of disk space can have a significant impact on bandwidth usage and browsing speed. (?costs?)
+</p>
+
+<p>Internet Firewalls (which are used to protect company networks) often have a proxy component. What makes the Squid proxy different from a firewall proxy? Most firewall proxies do not store copies of the returned data, instead they re-fetch requested data from the remote Internet server each time.
+</p>
+
+<p>Squid differs from firewall proxies in other ways too:
+</p>
+
+<ul>
+  <li>Many protocols are supported (firewalls often have specific proxies for specific protocols it's difficult to ensure code security of a large program)</li>
+  <li>Hierarchies of proxies, arranged in complex relationships are possible</li>
+</ul>
+
+<p>When, in this book, we refer to a 'cache', we are referring to a 'caching proxy' - something that keeps copies of returned data. A 'proxy' on the other hand, is a program which do not cache replies.
+</p>
+
+<p>The web consists of HTML pages, graphics and sound files (to name but a few!). Since only a very small portion of the web is made up of text, referring to all cached data as <em>pages</em> is misleading. To avoid ambiguity, caches store <em>objects</em>, not pages.
+</p>
+
+
+<p>Many Internet servers support more than one protocol. A given server can support more than one type <br>of query protocol. A web server uses the Hyper Text Transfer Protocol (HTTP) to serve data. An older protocol, the File Transfer Protocol (FTP) often runs on web servers too. Muddling them up would be bad. Caching an FTP response and returning the same data to the client on a subsequent HTTP request would be incorrect. Squid uses the complete URL to uniquely identify everything stored in the cache.
+</p>
+
+<p>So as to avoid returning out of date data to clients, objects must be expired. Squid therefore allows you to set <em>refresh times</em> for objects, ensuring old data is not returned to clients.
+</p>
+
+<p>Squid is based on software developed for the Harvest project, which developed their 'cached' (pronounced 'Cache-Dee') as a side project. Squid development is funded by the National Laboratory of Network Research (NLANR), who are in turn funded by the National Science Foundation (NSF). Squid is 'open source' software, and although development is done mainly with NSF funding (??), features are added and bugs fixed by a team of online collaborators.
+</p>
+
+<h3>Why Cache?</h3>
+
+<h4>Regions with plenty of bandwidth</h4>
+
+<p>Small Internet Service Providers (ISPs) cache to reduce their line costs, since a large portion of their operating costs are infrastructural, rather than staff related.
+</p>
+
+<p>Companies and content providers (such as AOL) have recently started caching. These organizations are not short of bandwidth (indeed, they often have as much bandwidth as a small country), but their customers occasionally see slow response. There are numerous reasons for this:
+</p>
+
+<h5>Origin Server Load</h5>
+
+<p>Raw bandwidth is increasing faster than overall computer performance. These days many servers act as a back-end for one site, load balancing incoming requests. Where this is not done, the result is slow response. If you have ever received a call complaining about slow response, you will know the benefit of caching - in many cases the user's mind is already made up: it's your fault.
+</p>
+
+<h5>Quick Abort</h5>
+
+<p>Squid can be configured to continue fetching objects (within certain size limits) even although somebody who starts a download aborts it. Since there is a chance of more than one person wanting the same file, it is useful to have a copy of the object in your cache, even if the first user aborts. Where you have plenty of bandwidth, this continued-fetching ensures that there will be a local copy of the object available, just in case someone else wants it. This can dramatically reduce latency, at the cost of higher bandwidth usage.
+</p>
+
+<h5>Peer Congestion</h5>
+
+<p>As bandwidth increases, router speed needs to increase at the same rate. Many peering points (where huge volumes of Internet traffic are exchanged) often do not have the router horsepower to support their ever-increasing load. You may invest vast sums of money to maintain a network that stays ahead of the growth curve, only to have all your effort wasted the moment packets move off your network onto a large peering point, or onto another service provider's network.
+</p>
+
+<h5>Traffic spikes</h5>
+
+<p>Large sporting, television and political events can cause spikes in Internet traffic. Events like The Olympics, the Soccer World Cup, and the Starr report on the Clinton-Lewinsky issue create large traffic spikes.
+</p>
+
+<p>You can plan ahead for sports events, but it's difficult to estimate the load that they will eventually cause. If you are a local ISP, and a local team reaches the finals, you are likely to get a huge peak in traffic. Companies can also be affected by traffic spikes, with bulk transfer of large databases or presentations flooding lines at random intervals. Though caching cannot completely solve this problem, it can reduce the impact.
+</p>
+
+<h5>Unreachable sites</h5>
+
+<p>If Squid attempts to connect to an origin server, only to find that it is down, it will log an error and return the object (even if there is a chance of sending out-of-date data to the client) from disk. This reduces the impact of a large-scale Internet outage, and can help when a backhoe digs up a major segment of your network backbone.
+</p>
+
+<h4>Regions with limited bandwidth</h4>
+
+<p>In many regions, bandwidth is expensive and latency due to very long haul links is high.
+</p>
+
+<h5>Costs</h5>
+
+<p>In many countries, or even in rural areas of industrialized countries, bandwidth may be expensive. Saving bandwidth reduces Internet infrastructural costs significantly. Since Internet connectivity is so expensive, ISPs and their customers reduce their bandwidth requirements with caches.
+</p>
+
+<h5>Latency</h5>
+
+<p>Although reduction of latency is not normally the major reason for introducing caching in these areas, the problems experienced in the high bandwidth regions are exacerbated by the high latency and lower speed of the lines to those regions.
+</p>
+
+
+<p>Squid acts only as a HTTP-type proxy - it will act as a proxy for browser-type applications. Generally speaking, though, it won't act as a proxy for applications other than browsers.
+</p>
+
+<p>Squid is based on the HTTP/1.1 specification. Squid can only proxy for programs that use this protocol for Internet access. Browsers, for example, use this specification; their primary function is the display of retrieved web data, using the HTTP protocol.
+</p>
+
+<p>FTP clients, on the other hand, often support proxy servers, but do not communicate with them using the HTTP protocol. These clients will not be able to understand the replies that Squid sends.
+</p>
+
+<p>Note, though, that web browsers can communicate with an HTTP-type proxy to connect
+</p>
+
+<p>Squid is also not a generic proxy, and only handles a small subset of all possible Internet protocols: Quake, News, RealAudio and Video Conferencing will <em>not</em> work through Squid. Squid only supports UDP for inter-cache communication - it does NOT support any client program that uses UDP for it's communication, which excludes many multimedia programs.
+</p>
+
+<h2>Supported Protocols</h2>
+<h3>Supported Client Protocols</h3>
+
+<p>Squid supports the following incoming protocol request types (when the proxy requests are sent in HTTP format)
+</p>
+
+<ul>
+<li>HyperText Transfer Protocol (HTTP), which is the specification that the WWW is based on.</li>
+<li>File Transfer Protocol (FTP)</li>
+<li>Gopher</li>
+<li>Wide Area Information Services (WAIS) (With the appropriate relay server.)</li>
+<li>Secure Socket Layer - which is used for secure online transactions.</li>
+</ul>
+
+<h3>Inter Cache and Management Protocols</h3>
+
+<ul>
+<li>HTTP, which is used for retrieving copies of objects from other caches.</li>
+<li>Internet Cache Protocol (ICP). ICP is used to find out if a specific object is in another cache's store.</li>
+<li>Cache Digests. This protocol is used to retrieve an index of objects in another cache's <br>  store. When a cache receives a request for an object it does not have, it checks <br>  this index to determine which cache does have the object.</li>
+<li>Simple Network Management Protocol (SNMP). Common SNMP tools can be used to retrieve <br> information about your cache.</li>
+<li>Hyper Text Caching Protocol (HTCP). Though HTCP is not widely implemented, Squid is in the process <br> of incorporating the protocol. (?check...1.2.3?)</li>
+</ul>
+
+<h2>Inter-Cache Communication Protocols</h2>
+
+<p>Squid gives you the ability to share data between caches, but why should you?
+</p>
+
+<p>Just as there is a benefit to connecting individual PC's to a network, and this network to the Internet, so there is an advantage to linking your cache to other people's networks of caches.
+</p>
+
+<p><em>Note</em>: The following is not a complete discussion on how the size of your user
+base will influence your hit rate. [[Installing Squid]] discusses this topic in more
+depth. In short: the larger your user base, the more objects requested, the
+higher the chance of an object being requested twice. To increase your hit
+rate, add more clients.
+</p>
+
+<p>However, in many cases the size of your user base is finite - it's limited by the number of staff members or customers. Co-operative peering with other caches increases the size of your user base, and effectively increases your hit rate. If you peer with a large cache, you will find that a percentage of the objects your users are requesting are already available there. Many people can increase their hit rate by about 5% by peering with other caches.
+</p>
+
+<p>If you have a large network, one cache may not handle all incoming
+requests. Rather than having to continuously upgrade one machine, it makes
+sense to split the load between multiple servers. This reduces individual
+server load, while increasing the overall number of queries your cache
+system can handle.
+</p>
+
+<p>Squid implements Inter-Cache protocols in a very efficient manner, through ICP Multicast queries, and Cache Digests, which allow for large networks of caches (hierarchies). With these features, large networks of caches add very little latency, allowing you to scale your cache infrastructure as you grow.
+</p>
+
+<p>For your cache system to be efficient and fast, not only is raw bandwidth an issue - choosing the right hardware and software is a difficult task.
+</p>
+
+<h2>Firewall Terminology</h2>
+
+<p>Firewalls are used by many companies to protect their networks. Squid is going to have to interact with your firewall to be useful. So that we are on the same wavelength, I cover some of the terminology here: it makes later descriptions easier if we get all the terms sorted out first.
+</p>
+
+<h3>The Two Types of Firewall</h3>
+<p>A <em>proxy-based</em> firewall does not route packets through to the end-user. All incoming data is handled by the firewall's IP stack, with programs (called proxies) that handle all the passing of data.
+</p>
+
+<p>Proxies accept incoming data from the outside, process it (to make sure that it is in form that is unlikely to break an internal server) and pass it on to machines on the inside. The software running on the proxy-level firewall is (hopefully!) written in a secure manner, so to crack through a proxy-level firewall you would probably have to find a hole in the firewall software itself, rather than on the software on inside machine.
+</p>
+
+<p>A <em>packet-filtering</em> firewall works on a per-packet basis, deciding whether to pass every packet to and from your inside machines on the basis of the packet's IP protocol, and source and destination IP/port pairs. If a publicly available service on an internal server is running buggy software, a cracker can probably penetrate your network.
+</p>
+
+<p>It's not up to me to say what sort of proxy is the best: it depends too much on your situation anyway. Packet filtering firewalls are normally the easiest to get Squid working through. The 'transparent redirection' of proxy firewalls, on the other hand, can be useful: it can make redirection of client machines to the cache server easy.
+</p>
+
+<h3>Firewalled Segments</h3>
+<p>If you have a firewall, your network is generally segmented in two: hosts are either trusted or untrusted. Trusted hosts are on the inside of the firewall. Untrusted hosts (basically the rest of the Internet) sit on the outside of the firewall.
+</p>
+
+<p>Occasionally, you may have a third class of hosts: semi-trusted. These hosts normally sit on a separate segment of the network, separate from your internal systems. They are not trusted by your secure hosts, but are still protected by the firewall. Public servers (such as web servers and ftp servers) are generally put here. This <em>zone</em> (or segment) is generally called a Demilitarized Zone (or DMZ).
+</p>
+
+<h3>Hand Offs</h3>
+<p>With a proxy-level firewall, client machines are normally configured to use the firewall's internal interface as a proxy server. Some firewalls can do automatic redirection of outgoing web requests, but may not be able to do authentication in this mode (?or is this heresy?). If you already have a large number of client machines setup to talk to the firewall as a proxy, the prospect of having to change all their setups can influence your decision on where to position the cache server. In many cases it's easier to re-configure the firewall to communicate with a parent, than to change the proxy server settings on all client machines.
+</p>
+
+<p>The vast majority of proxy-level firewalls are able to talk to another proxy server using HTTP. This feature is sometimes called a <em>hand-off</em>, and it is this which allows your firewall to talk to a <em>higher-level</em> firewall or cache server via HTTP. Hand-offs allow you to have a <em>stack</em> of firewalls, with higher-up firewalls protecting your entire company from outside attacks, and with lower-down firewalls protecting your different divisions from one another. When a firewall hands-off a request to another firewall or proxy server, it simply acts as a pipe between the client and the remote firewall.
+</p>
+
+<p>The term <em>hand-off</em> is a little misleading, since it implies that the lower-down firewall is somehow less involved in the data transfer. In reality the proxy process handling such a request is just as involved as when conversing directly with a destination server, since it is channeling data between the client and the firewall the connection was handed to. The lower-down firewall is, in fact, treating the higher-up cache as a <em>parent</em>.
+</p>

@@ -1,0 +1,661 @@
+
+<p>Access control lists (acls) are often the most difficult part of the configuration of a Squid cache: the layout and concept is not immediately obvious to most people. Hang on to your hat!
+</p>
+
+<p>Unless [[Squid_Configuration_Basics#Access_Control_Lists_and_Access_Control_Operators|Chapter 4]] is still fresh in your mind, you may wish to skip back and review the access control section of that chapter before you continue. This chapter assumes that you understood the difference between an acl and an acl-operator.
+</p>
+
+<h1>Uses of ACLs</h1>
+<p>The primary use of the acl system is to implement simple access control: to stop other people using your cache infrastructure. (There are other uses of acls, described later in this chapter; in the meantime we are going to discuss only the access control function of acls.) Most people implement only very basic access control, denying access to people that are not on their network. Squid's access system is incredibly flexible, but 99% of administrators only use the most basic elements. In this chapter some examples of the less common uses of acls are covered: hopefully you will discover some Squid feature which suits your organization - and which you didn't think was part of Squid before.
+</p>
+
+<h1>Access Classes and Operators</h1>
+<p>There are two elements to access control: <em>classes</em> and <em>operators</em>. Classes are defined with the <em>acl</em> squid.conf tag, while the names of the operators vary: the most common operator used is <code class='squid-tag-inline'>http_access</code>.
+</p>
+
+<p>Let's work through the below example line-by-line. Here, a systems administrator is in the process of installing a cache, and doesn't want other staff to access it while it's being installed, since it's likely to ping-pong up and down during the installation. Once the administrator is happy with the config, the whole network will be allowed access. The admin's PC is at the IP 10.0.0.3.
+</p>
+
+<p>If the admin connects to the cache from the PC, Squid does the following:
+</p>
+<ol>
+<li>Accepts the (HTTP) connection and reads the request.</li>
+<li>Checks the line that reads <code class='squid-tag-inline'>http_access allow myIP</code>.</li>
+<li>Since your IP address matches the IP defined in the myIP acl, access is allowed. Remember that Squid drops out of the operator list on the <em>first</em> match.</li>
+</ol>
+
+<p>If you connect from a different PC (on the 10.0.*.* network) things are very similar:
+</p>
+
+<ol>
+<li>Accepts the connection and reads the request.</li>
+<li>The source of the connection doesn't match the myIP acl, so the next http_access line is checked.</li>
+<li>The myNet acl matches the source of the connection, so access is denied. An error page is returned to the user instead of the requested page.</li>
+</ol>
+
+<p>If someone reaches your cache from another netblock (from, say, 192.168.*.*), the above access list will not block access. The reason for this is quite complicated. If Squid works through a set of acl-operators and finds no match, it defaults to using the opposite of the last match (if the previous operator is an allow, the default is to deny; if it's a deny, the default is to allow). This seems a bit strange at first, but let's look at an example where this behaviour is used: it's more sensible than it seems.
+</p>
+
+<p>The following acl example is nice and simple: it's something a first-time cache admin could create.
+</p>
+
+<p>A config file with no access lists will allow cache access without any restrictions. An administrator using the above access lists obviously wishes to allow only his network access to the cache. Given the Squid behavior of inverting the last decision, we have an invisible line reading
+</p>
+
+<pre><code>
+http_access deny all
+</code></pre>
+
+<p>Inverting the last decision is a simple (if not immediately obvious) solution to one of the most common acl mistakes: not adding a final <em>deny all</em> to the end of your acl list.
+</p>
+
+<p>With this new knowledge, have a look at the first example in this chapter: you will see why I said not to use it in your configs. Given that the last operator denies the local network, local people will not be able to access the cache. The remainder of the Internet, however, will! As discussed in [[Squid_Configuration_Basics#Access_Control_Lists_and_Access_Control_Operators|Chapter 4]], the simplest way of creating a catch-all acl is to match requests when they come from any IP address. When programs do netmask arithmetic a subnet of all zeros will match any IP address. A corrected version of the first example dispenses with the myNet acl.
+</p>
+
+<p>Once the cache is considered stable and is moved into production, the config would change. http_access lines do add a very small amount of overhead, but that's not the only reason to have simple access rulesets: the fewer rulesets, the easier your setup is to understand. The below example includes a <em>deny all</em> rule although it doesn't really need one: you may know of the automatic inversion of the last rule, but someone else working on the cache may not.
+</p>
+
+<p>You should always end your access lists with an explicit deny. In Squid-2.1 the default config file does this for you when you insert your HTTP acl operators in the appropriate place.
+</p>
+
+<h1>Acl lines</h1>
+
+<p>The Examples so far have given you an idea of an acl line's layout. Their layout can be symbolized as follows (? Check! ?):</p>
+<pre><code>
+acl name type (string|"filename") [string2] [string3] ["filename2"]
+</code></pre>
+
+<p>The acl tag consists of a minimum of three fields: a unique name; an acl type and a decision string. An acl line can have more than one decision string, hence the <em>[string2]</em> and <em>[string3]</em> in the line above.
+</p>
+
+<h2>A unique name</h2>
+<p>This is supposed to be descriptive. Use a name such as <em>customers</em> or <em>mynet</em>. You have seen this lots of times before: the word myNet in the above example is one such case.
+</p>
+
+<p>There must only be one acl with a given name; if you find that you have two or more classes with similar names, you can append a number to the name: <em>customer1</em>, <em>customer2</em> etc. I generally avoid this, instead putting all similar data on these classes into a file, and including the whole file as one acl. Check the <em>Decision String</em> section for some more info on this.
+</p>
+
+<h2>Type</h2>
+<p>So far we have discussed only acls that check the source IP address of the connection. This isn't sufficient for many people: it may be useful for you to allow connections at only certain times, or to only specific domains, or by only some users (using usernames and passwords). If you really want to, you can even combine all of the above: only allow connections from users that have the right password, have the right destination and are going to the right domain. There are quite a few different acl types: the next section of this chapter discusses all of the different types in detail. In the meantime, let's finish the description of the structure of the acl line.
+</p>
+
+<h2>Decision String</h2>
+<p>The acl code uses this string to check if the acl matches a given connection. When using this field, Squid checks the <em>type</em> field of the acl line to decide how to use the decision string. The decision string could be an IP address range, a regular expression or a list of domains or more. In the next section (where we discuss the types of acls available) we discuss the different forms of the Decision String.
+</p>
+
+<p>If you have another look at the formal definition of the acl line above, you will note that you can have more than one decision string per acl line. Strings in this format are <em>OR</em>-ed together; if you were to specify two IP address ranges on the same line the return result of the acl would be true if <em>either</em> of the IP addresses match. (If source strings were <em>AND</em>-ed together, then an incoming request would have to come from two IP address ranges at the same time. This is not impossible, but would almost certainly be pointless.)
+</p>
+
+<p>Large decision lists can be stored in files, so that your squid.conf doesn't get cluttered. Some of the caches I have worked on have had in the region of 2000 lines of acl rules, which could lead to a very cluttered <em>squid.conf</em> file. You can include a file into the decision section of an acl list by placing the filename (with path) in double-quotes. The file simply contains the data set; one datum per line. In the next example the file <em>/usr/local/squid/conf/data/myNets</em> can contain any number of IP ranges, one range per line.
+</p>
+
+<p>While on the topic of long lists of acls: it's important to note that you can end up slowing your cache response with very long lists of acls. Checking acls requires CPU time, and long lists can decrease cache performance, since instead of moving data to clients Squid is busy checking access lists. What constitutes a long list? Don't worry about lists with a few hundred entries unless you have a really slow or busy CPU. Lists thousands of lines long can, however, cause problems.
+</p>
+
+<h2>Types of acl</h2>
+<p>So far we have only spoken about acls that filter by source IP address. There are numerous other acl types:</p>
+
+<ul>
+  <li>Source/Destination IP address</li>
+  <li>Source/Destination Domain</li>
+  <li>Regular Expression match of requested domain</li>
+  <li>Words in the requested URL</li>
+  <li>Words in the source or destination domain</li>
+  <li>Current day/time</li>
+  <li>Destination port</li>
+  <li>Protocol (FTP, HTTP, SSL)</li>
+  <li>Method (HTTP GET or HTTP POST)</li>
+  <li>Browser type</li>
+  <li>Name (according to the Ident protocol)</li>
+  <li>Autonomous System (AS) number</li>
+  <li>Username/Password pair</li>
+  <li>SNMP Community</li>
+</ul>
+
+<h3>Source/Destination IP address</h3>
+
+<p>In the examples earlier in this chapter you saw lines in the following format:</p>
+
+<pre><code>
+ acl myNet src 10.0.0.0/255.255.0.0 
+ http_access allow myNet
+</code></pre>
+
+<p>The above acl will match when the IP address comes <em>from</em> any IP address between <em>10.0.0.0</em> and <em>10.0.255.255</em>. In recent years more and more people are using Classless Internet Domain Routing (CIDR) format netmasks, like <em>10.0.0.0/16</em>. Squid handles both the traditional <em>IP/Netmask</em> and more recent <em>IP/Bits</em> notation in the src acl type. IP ranges can also be specified in a further format: one that is Squid specific. (? I need to spend some time hacking around with these: I am not sure of the layout ?)
+</p>
+
+<pre><code>
+acl myNet src addr1-addr2/netmask
+http_access allow myNet
+</code></pre>
+
+<p>Squid can also match connections by destination IP. The layout is very similar: simply replace <em>src</em> with <em>dst</em>. Here are a couple of examples:</p>
+
+<h3>Source/Destination Domain</h3>
+<p>Squid can also limit requests by their source domain. Though it doesn't always happen in the real world, network administrators can add reverse DNS entries for each of the hosts on their network. (These records are normally referred to as <em>PTR</em> records.) Squid can make decisions about the validity of incoming requests by checking their reverse DNS entries. In the below example, the acl is true if the request comes from a host with a reverse entry that is in either the qualica.com or squid-cache.org domains.
+</p>
+<pre><code>
+acl myDomain srcdomain .qualica.com .squid-cache.org
+http_access allow myDomain
+</code></pre>
+
+<p>Reverse DNS matches should not be used where security is important. A determined attacker (who controlled the reverse DNS entries for the attacking host) would be able to manipulate these entries so that the request comes from your domain. Squid doesn't attempt to check that reverse and forward DNS entries match, so this option is not recommended.
+</p>
+
+<p>Squid can also be configured to deny requests <em>to</em> specific domains. Many people implement these filter lists for pornographic sites. The legal implications of this filtering are not covered here: there are many, and the relevant law is in a constant state of flux, so advice here would likely be obsolete in a very short period of time. I suggest that you consult a good lawyer if you want to do something like this.
+</p>
+
+<p>The <em>dst</em> acl type allows one to match accesses by <em>destination</em> domain. This could be used to match urls for popular adult sites, and refuse access (perhaps during specific times).
+</p>
+
+<p>If you want to deny access to a set of sites, you will need to find out these site's IP addresses, and deny access to these <em>IP addresses</em> too. If you just put the URL Domain name in, someone determined to access a specific site could find out the IP address associated with that hostname and access it by entering the IP address in their browser.
+</p>
+
+<p>The above is best described with an example. Here, I assume that you want to restrict access to the site <em>www.adomain.example</em>. If you use either the <em>host</em> of <em>nslookup</em> commands, you would find that this server has the IP address 10.255.1.2. It's easiest to just have two acls: one for IPs and one for domains. If the lists get too large, you can simply place them in a file.
+</p>
+
+<h3>Words in the requested URL</h3>
+<p>Most caches can filter out URLs that contain a set of <em>banned</em> words. Regular expressions allow you to simply check if a word is in a given URL, but they also allow for more powerful searches of the URL. With a simple word check you would find it nearly impossible to create a rule that allows access to sites with the word <em>sex</em> in the URL, but at the same time denies access to all <em>avi</em> files on that site. With regular expressions this sort of checking becomes easy, once you understand the regex syntax.
+</p>
+
+<h4>A Quick introduction to regular expressions</h4>
+<p>We haven't encountered regular expressions in this book yet. A regular expression (regex) is an incredibly useful way of matching strings. As they are incredibly powerful they can get a little complicated. Regexes are often used in string-oriented languages like Perl, where they make processing of large text files (such as logs) incredibly easy. Squid uses regular expressions for numerous things: refresh patterns and access control among them.
+</p>
+
+<p>If you have not used regular expressions before, you might want to have a look at the O'Reilly book on regular expressions or the appropriate section in the O'Reilly perl book. Instead of going into detail here, I am just going to give some (hopefully) useful examples. If you have perl installed on your machine, you could have a look at the <em>perlre</em> manual page to get an idea as to how the various regex operators (such as <em>.</em>) function.
+</p>
+
+<p>Regular expressions in Squid are case-sensitive by default. If you want to match both upper or lower-case text, you can prefix the regular expression with a <em>-i</em>. Have a look at the next example, where we use this to match either <em>sex</em> <em>SEX</em> (or even <em>SeX</em>).
+</p>
+
+<h4>Using Regular expressions to match words in the requested URL</h4>
+<p>Using regular expressions allows you to create more flexible access lists. So far you have only been able to filter sites by destination domain, where you have to match the entire domain to deny access to the site. Since regular expressions are used to match text strings, you can use them to match words, partial words or patterns in URLs or domains.
+</p>
+
+<p>The most common use of regex filters in ACL lists is for the creation of far-reaching site filters: if the url or domain contain a set of banned words, access to the site is denied. If you wish to deny access to sites that contain the word <em>sex</em> in the URL, you would add one acl rule, rather than trying to find every site that has adult material on it.
+</p>
+
+<p>The big problem with regex filters is that not all sites that contain the word <em>sex</em> in the URL are pornographic. By denying these sites you are likely to be infringing people's rights, and you should refer to a lawyer for advice on the legality of this.
+</p>
+
+<p>Creating a list of sites that you don't want accessed can be tedious. There are companies that sell adult/unwanted material lists which plug into Squid, but these can be expensive. If you cannot justify the cost, you may be able to locate a free list, though they will not include full coverage.
+</p>
+
+<p>The <code class='squid-tag-inline'>url_regex</code> acl type is used to match any word in the URL. Here is an example:
+</p>
+
+<p>In places where bandwidth is very expensive, system administrators may have no problem with people visiting pornograpic sites. They may, however, want to stop people downloading huge <em>avi</em> files from these sites. The following example would deny downloads of <em>avi</em> files from sites that contain the word <em>sex</em> in the URL. The regular expression below matches any URL that contains the word <em>sex</em> AND ends with <em>.avi</em>.
+</p>
+
+<p>The <code class='squid-tag-inline'>urlpath_regex</code> acl strips off the url-type and hostname, checking instead only the path and filename.
+</p>
+
+<h4>Words in the source or destination domain</h4>
+<p>Regular expressions can also be used for checking the source and destination domains of a request. The <code class='squid-tag-inline'>srcdom_regex</code> tag is used to check that a request comes from a specific subdomain, while the <code class='squid-tag-inline'>dstdom_regex</code> checks the domain part of the requested URL. (You could check the requested domain with a <code class='squid-tag-inline'>url_regex</code> tag, but you could run into interesting problems with sites that refer to pages with urls like <em>http://www.company.example/www.anothersite.example</em>.)
+</p>
+
+<p>Here is an example acl set that uses a regular expression (rather than using the <em>srcdomain</em> and <em>dstdomain</em> tags). This example allows you to deny access to <em>.com</em> or <em>.net</em> sites if the request is from the <em>.za</em> domain. This could be useful if you are providing a "public peering" infrastructure to other caches in your geographical region. Note that this example is only a fragment of a complete acl set: you would presumably want your customers to be able to access any site, and there is no final deny acl.
+</p>
+
+<pre><code>
+    acl bad_dst_TLD dstdom_regex \.com$ \.net$
+    acl good_src_TLD srcdom_regex \.za$
+    # allow requests FROM the za domain,
+    # UNLESS they want to go to \.com or \.net
+    http_access deny bad_dst_TLD 
+    http_access allow good_src_TLD
+</code></pre>
+
+<h3>Current day/time</h3>
+<p>Squid allows one to allow access to specific sites by time. Often businesses wish to filter out irrelevant sites during work hours. The Squid <em>time</em> acl type allows you to filter by the current day and time. By combining the <em>dstdomain</em> and <em>time</em> acls you can allow access to specific sites (such as your the sites of suppliers or other associates) during work hours, but allow access to other sites after work hours.
+</p>
+
+<p>The layout is quite compact:</p>
+<pre><code>acl name time [day-list] [start_hour:minute-end_hour:minute]</code></pre>
+
+<p>Day list is a list of single characters indicating the days that the acl applies to. Using the first letter of the day would be ambiguous (since, for example, both Tuesday and Thursday start with the same letter). When the first letter is ambiguous, the second letter is used: <em>T</em> stands for Tuesday, <em>H</em> for Thursday. Here is a list of the days with their single-letter abreviations:
+</p>
+
+<p><em>S</em> - Sunday <em>M</em> - Monday <em>T</em> - Tuesday <em>W</em> - Wednesday <em>H</em> - Thursday <em>F</em> - Friday <em>A</em> - Saturday
+</p>
+
+<p>Start_hour and end_hour are times written in 24-hour ("military") time (17:00 instead of 5:00). End_hour must always be larger than start_hour. Unfortunately, this means that you can't simply write:</p>
+<pre><code>acl darkness 17:00-6:00 # won't work</code></pre>
+
+You have to specify two separate ranges:
+<pre><code>
+acl night time 17:00-24:00
+acl early_morning time 00:00-6:00
+</code></pre>
+
+<p>As you can see from the original definition of the <em>time</em> acl, you can specify the day of the week (with no time), the time (with no day), or both the time and day (?check!?). You can, for example, create a rule that specifies weekends without specifying that the day starts at midnight and ends at the following midnight. The following acl will match on either Saturday or Sunday.
+</p>
+<pre><code>acl weekends time SA</code></pre>
+
+<p>The following example is too basic for real-world use. Unfortunately, creating a good example requires some of the more advanced features of the http_access line; these are covered (with examples) in the next section of this chapter.
+</p>
+
+<h3>Destination Port</h3>
+<p>Because of the design of the HTTP protocol, people can connect to things like IRC servers through your cache servers, even though the two protocols are very different. The same problems can be used to tunnel telnet connections through your cache server. The part of HTTP that allows this is the <em>CONNECT</em> method, mainly used for securing  <em>https</em> connections with SSL.
+</p>
+
+<p>Since you generally don't want to proxy anything other than the standard supported protocols, you can restrict the ports that your cache is willing to connect to. Web servers almost always listen for incoming requests on port 80. Some servers (notably site-specific search engines and unofficial sites) listen on other ports, such as 8080. Other services (such as IRC) also use high-numbered ports. The default Squid config file limits standard HTTP requests to the port ranges defined in the <code class='squid-tag-inline'>Safe_ports</code> squid.conf acl. SSL <em>CONNECT</em> requests are even more limited, allowing connections to only ports 443 and 563. <em>However</em>, keep in mind that these port assignments are only a convention and nothing prevents people from hosting (on machines they control) any type of server on any port they choose.
+</p>
+
+<p>Port ranges are limited with the <em>port</em> acl type. If you look in the default <em>squid.conf</em>, you will see lines like:</p>
+<pre><code>
+acl SSL_ports port 443 563
+acl Safe_ports port 80 21 443 563 70 210 1025-65535
+</code></pre>
+ 
+<p>The format is pretty straightforward: a destination port of 443 or 563 is matched by the first acl, while 80, 21, 443, etc. by the second line. The most complicated section of the examples above is the end of the line: the text that reads "1025-65535".
+</p>
+
+<p>The "-" character is used in squid to specify a <em>range</em>. The example thus matches any port from 1025 all the way up to 65535. These ranges are inclusive, so the second line matches ports 1025 and 65535 too.
+</p>
+
+<p>The only low-numbered ports which Squid should need to connect to are 80 (the HTTP port), 21 (the FTP port), 70 (the Gopher port), 210 (wais) and the appropriate SSL ports. All other low-numbered ports (where common services like telnet run) do not fall into the 1024-65535 range, and are thus denied.
+</p>
+
+<p>The following http_access line denies access to URLs that are not in the correct port ranges. You have not seen the <em>!</em> http_access operator before: it inverts the decision. The line below would read "deny access if the request does not fall in the range specified by acl Safe_ports" if it were written in english. If the port matches one of those specified in the Safe_ports acl line, the next http_access line is checked. More information on the format of http_access lines is given in the next section <em>Acl-operator lines</em>.
+</p>
+<pre><code>http_access deny !Safe_ports</code></pre>
+
+<h3>Protocol (FTP, HTTP, SSL)</h3>
+<p>Some people may wish to restrict their users to specific protocols. The <em>proto</em> acl type allows you to restrict access by the URL prefix: the <em>http://</em> or <em>ftp://</em> bit at the front. The following example will deny requests that use the FTP protocol.
+</p>
+
+<p>The default <em>squid.conf</em> file denies access to a special type of URL, those which use the <code class='squid-tag-inline'>cache_object</code> protocol. When Squid sees a request for one of these URLs it serves up information about itself: usage statistics, performance information and the like. The world at large has no need for this information, and it could be a security risk.
+</p>
+
+<h3>HTTP Method (GET, POST or CONNECT)</h3>
+<p>HTTP can be used for downloading (<em>GET</em>ting data) or uploads (<em>POST</em>ing data to a site). The <em>CONNECT</em> mode is used for SSL data transfers. When a connection is made to the proxy the client specifies what kind of request (called a <em>method</em>) it is sending. A <em>GET</em> request looks like this:
+</p>
+<pre>
+  GET http://www.qualica.com/ HTTP/1.1
+ <em>blank-line</em>
+</pre>
+<p>If you were connecting using SSL, the <em>GET</em> word would be replaced with the word <em>CONNECT</em>.
+</p>
+
+<p>You can control what methods are allowed through the cache using the <em>post</em> acl type. The most common use is to stop <em>CONNECT</em> type requests to non-SSL ports. The <em>CONNECT</em> method allows data transfer in any direction at any time: if you telnet to a badly configured proxy, and enter something like the below, you might end up with a telnet connection to www.domain.example just as if you had telnetted there from the cache server itself. 
+</p>
+
+<pre>
+  CONNECT www.domain.example:23 HTTP/1.1
+  <em>blank-line</em>
+</pre>
+
+<p>This can be used get around packet-filters, firewall access lists and passwords, which is generally considered a bad thing!</p>
+
+<p>Since <em>CONNECT</em> requests can be quite easily exploited, the default <em>squid.conf</em> denies access to SSL requests to non-standard ports (as described in the section on the <em>port</em> acl-operator.)
+</p>
+
+<p>Let's assume that you want to stop your clients from POSTing to any sites (note that doing this is not a good idea, since people using some search engines (for example) would run into problems: at this stage this is just an example.(?TODO: Example)
+</p>
+
+<h3>Browser type</h3>
+<p>Companies sometimes have policies as to what browsers people can use. The <em>browser</em> acl type allows you to specify a regular expression that can be used to allow or deny access..</p>
+
+<h3>Username</h3>
+<p>Logs generally show the source IP address of a connection. When this address is on a multiuser machine (let's use a Unix machine at a university as an example) you cannot pin down a request as being from a specific user. There could be hundreds of people logged into the Unix machine, and they could all be using the cache server. Trying to track down a misbehaver is very difficult in this case, since you can never be sure which user is actually doing what. To solve this problem, the <em>ident</em> protocol was created. When the cache server accepts a new connection, it can call back to the origin server (on a low-numbered port, so the reply cannot be faked) to find out who's on the other end of the connection. This doesn't make any sense on single-user systems: people can just load their own <em>ident</em> servers (and become daffy duck for a day). If you run multi-user systems then you may want only certain people on those machines to be able to use the cache. In this case you can use the ident username to allow or deny access.
+</p>
+
+<p>One of the best things about Unix is the flexibility you get. If you wanted (for example) only students in their second year on to have access to the cache servers via your Unix machines, you could create a replacement <em>ident</em> server. This server could find out which user that has connected to the cache, but instead of returning the username you could return a string like "third_year" or "postgrad". Rather than maintaining a list of which students are in on both the cache server <em>and</em> the central Unix system, you could simple Squid rules, and the ident server could do all the work where it checks which user is which.
+</p>
+
+<h3>Autonomous System (AS) Number</h3>
+<p>Squid is often used by large ISPs. These ISPs want all of their customers to have access to their caches without having incredibly long manually-maintained ACL lists (don't forget that such long lists of IPs generally increase the CPU usage of Squid too). Large ISP's all have <em>AS</em> (Autonomous System) numbers which are used by other Internet routers which run the BGP (Border Gateway Protocol) routing protocol.
+</p>
+
+<p>The whois server <em>whois.ra.net</em> keeps a (supposedly authoritive) list of all the IP ranges that are in each AS. Squid can query this server and get a list of all IP addresses that the ISP controls, reducing the number of rules required. The data returned is also stored in a radix tree, for more cpu-friendly retrieval.
+</p>
+
+<p>Sometimes the whois server is updated only sporadically. This could lead to problems with new networks being denied access incorrectly. It's probably best to automate the process of adding new IP ranges to the whois server if you are going to use this function.
+</p>
+
+<p>If your region has some sort of local whois server that handles queries in the same way, you can use the <code class='squid-tag-inline'>as_whois_server</code> Squid config file option to query a different server.
+</p>
+
+<h3>Username and Password</h3>
+<p>If you want to track Internet usage it's best to get users to log into the cache server when they want to use the net. You can then use a stats program to generate per-user reports, no matter which machine on your network a person is using. Universities and colleges often have labs with many machines, where it is difficult to tell which user is sitting in front of a machine at any specific time. By using names and passwords you will solve this problem.
+</p>
+
+<p>Squid uses modules to do user authentication, rather than including code to do it directly. The default Squid source does, however, include two standard modules; The first authenticates users from a file, the other uses SMB (MS Windows) authentication. Since these modules are not compiled when you compile Squid itself, you will need to <em>cd</em> to the appropriate source directory (under <code class='squid-tag-inline'>auth_modules</code>) and run <em>make</em>. If the compile goes well, a <em>make install</em> will place the program file in the <em>/usr/local/squid/bin/</em> directory and any config files in the <em>/usr/local/squid/etc/</em> directory.
+</p>
+
+<p>NCSA authentication is the easiest to use, since it's self contained. The SMB authentication program requires that Samba (samba.org) be installed, since it effectively talks to the SMB server through Samba.
+</p>
+
+<p>The squid.conf file uses the <code class='squid-tag-inline'>authenticate_program</code> tag to decide which external program to use to authenticate users. If Squid were to only start one authentication program, a slow username/password lookup could slow the whole cache down (while all other connections waited to be authenticated). Squid thus opens more than one authentication program at a time, sending pending requests to the second when the first is busy, the third when the second is and so forth. The actual number started is specified by the <code class='squid-tag-inline'>authenticate_children</code> squid.conf value. The default is five, but you will probably need to increase this for a heavily loaded cache server.
+</p>
+
+<h3>Using the NCSA authentication module</h3>
+<p>To use the NCSA authentication module, you will need to add the following line to your squid.conf:
+</p>
+<pre><code>authenticate_program /usr/local/squid/bin/ncsa_auth /usr/local/squid/etc/passwd</code></pre>
+
+<p>You will also need to create the appropriate password file (<em>/usr/local/squid/etc/passwd</em> in the example above). This file consists of a username and password pair, one per line, where the username and password are seperated by a colon (:), just as they are in a Unix /etc/passwd file. The password is encrypted with the same function as the passwords in /etc/passwd (or /etc/shadow on newer systems) are. Here is an example password line:
+</p>
+<pre><code>oskar:lKdpxbNzhlo.w</code></pre>
+
+<p>Since the encrypted passwords are the same, and the ncsa_auth module understands the /etc/passwd or /etc/shadow file format, you could simply copy the system password file periodically. If your users do not already have passwords in Unix <em>crypt</em> format somewhere, you will have to use the <em>htpasswd</em> program (in <em>/usr/local/squid/bin/</em>) to generate the appropriate user and password pairs.
+</p>
+
+<h3>Using the SMB authentication module</h3>
+
+<p>Very Simple...
+</p>
+
+<pre><code>
+authenticate_ip_ttl 5 minutes
+auth_param basic children 5
+auth_param basic realm Servidor de Autenticacion!
+auth_param basic program /usr/lib/squid/smb_auth -W work_group -I server_name
+</code></pre>
+
+<h3>Using the RADIUS authentication module</h3>
+<p>Once you have compiled (./compile & make & make install) "Squid_radius_auth" (you can get a copy here: [http://www.squid-cache.org/contrib/squid_radius_auth/ http://www.squid-cache.org/contrib/squid_radius_auth/]), you must add this follow line to squid.conf (for basic auth):
+</p>
+
+<pre><code>
+acl external_traffic proxy_auth REQUIRED
+http_access allow external_traffic
+auth_param basic program /usr/local/squid/libexec/squid_radius_auth  -f /usr/local/squid/etc/squid_radius_auth.conf
+auth_param basic children 5
+auth_param basic realm This is the realm
+auth_param basic credentialsttl 45 minutes
+</code></pre>
+
+<p>After you have added this parameter you must edit /usr/local/squid/etc/squid_radius_auth.conf and change the default hostname of RADIUS server hostname (or IP) and change the key. Restart squid for it to take effect.
+</p>
+
+<h3>SNMP Community</h3>
+<p>If you have configured Squid to support SNMP, you can also create acls that filter by the requested SNMP community. By combining source address (with the <em>src</em> acl type) and community filters (using the <code class='squid-tag-inline'>snmp_community</code> acl type) you can restrict sensitive SNMP queries to administrative machines while allowing safer queries from the public. SNMP setup is covered in more detail later in the chapter, where we discuss the <code class='squid-tag-inline'>snmp_access</code> acl-operator.
+</p>
+
+<h1>Acl-operator lines</h1>
+<p>Acl-operators are the other half of the acl system. For each connection the appropriate acl-operators are checked (in the order that they appear in the file). You have met the <code class='squid-tag-inline'>http_access</code> and <code class='squid-tag-inline'>icp_access</code> operators before, but they aren't the only Squid acl-operators. All acl-operator lines have the same format; although the below format mentions <code class='squid-tag-inline'>http_access</code> specifically, the layout also applies to all the other acl-operators too.
+</p>
+
+<pre><code>http_access allow|deny [!]aclname [& [!]aclname2 ... ]</code></pre>
+
+<p><em>note: </em> field-testing above on old squid 2.3 suggests "&amp;" must be omitted
+</p>
+
+<p>Let's work through the fields from left to right. The first word is <code class='squid-tag-inline'>http_access</code>, the actual acl-operator.
+</p>
+
+<p>The <em>allow</em> and <em>deny</em> words come next. If you want to deny access to a specific class of users, you can change the customary <em>allow</em> to <em>deny</em> in the acl line. We have seen where a deny line is useful before, with the final deny of all IP ranges in previous examples.
+</p>
+
+<p>Let's say that you wanted to deny Internet access to a specific list of IP addresses during the day. Since acls can only have one type per acl, you could not create an acl line that matches an IP address during specific times. By combining more than one acl per acl-operator line, though, you get the same effect. Consider the following acls:
+</p>
+<pre><code>
+acl dialup src 10.0.0.0/255.255.255.0
+acl work time 08:00-17:00
+</code></pre>
+
+<p>If you could create an acl-operator that was matched when both the <em>dialup</em> and <em>work</em> acls were true, clients in the range could only connect during the right times. This is where the <em>aclname2</em> in the above acl-operator definition comes in. When you specify more than one acl per acl-operator line, both acls have to be matched for the acl-operator to be true. The acl-operator function AND's the results from each acl check together to see if it is to return true of false.
+</p>
+
+<p>You could thus deny the dialup range cache access during working hours with the following acl rules:
+</p>
+
+<p>You can also invert an acl's result value by using an exclamation mark (the traditional NOT value from many programming languages) before the appropriate acl. In the following example I have reduced Example 6-4 into one <code class='squid-tag-inline'>http_access</code> line, taking advantage of the implicit inversion of the last rule to deny access to all clients.
+</p>
+
+<p>Since the above example is quite complicated, let's cover it in more detail:
+</p>
+
+<p>In the above example an IP from the outside world will match the 'all' acl, but not the 'myNet' acl; the IP will thus match the http_access line. Consider the binary logic for a request coming in from the outside world, where the IP is not defined in the myNet acl.
+</p>
+<pre><code>Deny http access if ((true) & (!false))</code></pre>
+
+<p>If you consider the relevant matching of an IP in the 10.0.0.0 range, the myNet value is true, the binary representation is as follows:</p>
+
+<pre><code>Deny http access if ((true) & (!true))</code></pre>
+
+<p>A 10.0.0.0 range IP will thus <em>not match</em> the only <code class='squid-tag-inline'>http_access</code> line in the squid config file. Remembering that Squid will default to the opposite of the last match in the file, accesses will be allowed from the myNet IP range.
+</p>
+
+<h2>The other Acl-operators</h2>
+<p>You have encountered only the <code class='squid-tag-inline'>http_access</code> and <code class='squid-tag-inline'>icp_access</code> acl-operators so far. Other acl-operators are:</p>
+
+<ul>
+<li>no_cache</li>
+<li>ident_lookup_access</li>
+<li>miss_access</li>
+<li>always_direct, never_direct</li>
+<li>snmp_access (covered in the next section of this chapter)</li>
+<li>delay_classes (covered in the next section of this chapter)</li>
+<li>broken_posts</li>
+</ul>
+
+<h3>The no_cache acl-operator</h3>
+
+<p>The <code class='squid-tag-inline'>no_cache</code> acl-operator is used to ensure freshness of objects in the cache. The default Squid config file includes an example <code class='squid-tag-inline'>no_cache</code> line that ejects the results of cgi programs from the cache. If you want to ensure that cgi pages are not cached, you must un-comment the following lines from <em>squid.conf</em>:
+</p>
+
+<pre><code>
+acl QUERY urlpath_regex cgi-bin \\?
+no_cache deny QUERY
+</code></pre>
+
+<p>The first line uses a regular expression match to find urls that have <em>cgi-bin</em> or <em>?</em> in the path (since we are using the <code class='squid-tag-inline'>urlpath_regex</code> acl type, a site with a name like <em>cgi-bin.qualica.com</em> will not be matched.) The <code class='squid-tag-inline'>no_cache</code> acl-operator is then used to eject matching objects from the cache.
+</p>
+
+<h3>The ident_lookup_access acl-operator</h3>
+<p>Earlier we discussed using the ident protocol to control cache access. To reduce network overhead, Squid does an ident lookup only when it needs to. If you are using ident to do access control, Squid will do an ident lookup for every request, and you don't have to worry about this acl-operator.
+</p>
+
+<p>Many administrators would like to log the the ident value for connections without actually using it for access control. Squid used to have a simple on/off switch for ident lookups, but this incurred extra overhead for the cases where the ident lookup wasn't useful (where, for example, the connection is from a desktop PC).
+</p>
+
+<p>Let's consider some examples. Assume that a you have one Unix server (at IP address 10.0.0.3), and all remaining IP's in the 10.0.0.0/255.255.255.0 range are desktop PC's. You don't want to log the ident value from PC's, but you do want to record it when the connection is from the Unix machine. Here is an example acl set that does this:
+</p>
+
+<p>If a system cracker is attempting to attack your cache, it can be useful to have their ident value logged. The following example gets Squid not to do ident lookups for machines that are allowed access, but if a request comes from a disallowed IP range, an ident lookup is done and inserted into the log.
+</p>
+
+<h3>The miss_access acl-operator</h3>
+
+<p>The ICP protocol is used by many caches to find out if objects are in another cache's on-disk store. If you are peering with other organisation's caches, you may wish them to treat you as a <em>sibling</em>, where they only get data that you already have stored on disk. If an unscrupulous cache-admin were to change their <code class='squid-tag-inline'>cache_peer</code> line to read <em>parent</em> instead of <em>sibling</em>, they could get you to retrieve objects on their behalf.
+</p>
+
+<p>To stop this from happening, you can create an acl that contains the peering caches, and use the <code class='squid-tag-inline'>miss_access</code> acl-operator to ensure that only hits are served to these caches. In response to all other requests, an access-denied message is sent (so if a sibling complains that they almost always get error messages, it's likely that they think that you should be their parent, and you think that they should be treating you as a sibling.)
+</p>
+
+<p>When looking at the following example it is important to realise that <code class='squid-tag-inline'>http_access</code> lines are checked <em>before</em> any <code class='squid-tag-inline'>miss_access</code> lines. If the request is denied by the <code class='squid-tag-inline'>http_access</code> lines, an error page is returned and the connection closed, so <code class='squid-tag-inline'>miss_access</code> lines are never checked. This means that the last <code class='squid-tag-inline'>miss_access</code> line in the example doesn't allow random IP ranges to access your cache, it only allows ranges that have passed the <code class='squid-tag-inline'>http_access</code> test through. This is simpler than having one <code class='squid-tag-inline'>miss_access</code> line for each <code class='squid-tag-inline'>http_access</code> line in the file, and it will reduce CPU usage too, since only two acls are checked instead of the six we would have instead.
+</p>
+
+<h3>The always_direct and never_direct acl-operators</h3>
+<p>These operators help you make controlled decisions about which servers to connect to directly, and which to connect through a parent cache/proxy. I previously discussed this set of options briefly in [[Squid_Configuration_Basics#Ensuring_Direct_Access_to_Internal_Machines|Chapter 3]], during the <em>Basic Installation</em> phase.
+</p>
+
+<p>These tags are covered in detail in the following chapter, in the <em>Peer Selection</em> section.
+</p>
+
+<h3>The broken_posts acl-operator</h3>
+<p>Some servers incorrectly handle POST data, requiring an extra Carriage-Return (CR) and Line-Feed (LF) after a POST request. Since obeying the HTTP specification will make Squid incompatible with these servers, there is an option to be non-compliant when talking to a specific set of servers. This option should be very rarely used. The <code class='squid-tag-inline'>url_regex</code> acl type should be used for specifying the broken server.
+</p>
+
+<h1>SNMP Configuration</h1>
+<p>Before we continue: if you wish to use Squid's SNMP functions, you will need to have configured Squid with the <em>--enable-snmp</em> option, as discussed way back in [[Installing_Squid#Simple_Network_Monitoring_Protocol_.28SNMP.29|Chapter 2]]. The Squid source only includes SNMP code if it is compiled with the correct options.
+</p>
+
+<p>Normally a Unix SNMP server (also called an agent) collects data from the various services running on a machine, returning information about the number of users logged in, the number of sendmail processes running and so forth. As of this writing, there is no SNMP server which gathers Squid statistics and makes them available to SNMP managment stations for interpretation. Code has thus been added to Squid to handle SNMP queries directly.
+</p>
+Squid normally listens for incoming SNMP requests on port <em>3401</em>. The standard SNMP port is <em>161</em>.
+
+<p>For the moment I am going to assume that your management station can collect SNMP data from a port other than 161. Squid will thus listen on port 3401, where it will not interfere with any other SNMP agents running on the machine.
+</p>
+
+<p>No specific SNMP agent or mangement station software is covered by this text. A Squid-specific <em>mib.txt</em> file is included in the <em>/usr/local/squid/etc/</em> directory. Most management station software should be able to use this file to construct Squid-specific queries.
+</p>
+
+<h2>Querying the Squid SNMP server on port 3401</h2>
+
+<p>All <code class='squid-tag-inline'>snmp_access</code> acl-operators are checked when Squid is queried by an SNMP management station. The default <em>squid.conf</em> file allows SNMP queries from any machine, which is probably not what you want. Generally you will want only one machine to be able to do SNMP queries of your cache. Some SNMP information is confidential, and you don't want random people to poke around your cache settings. To restrict access, simply create a <em>src</em> acl for the appropriate IP address, and use <code class='squid-tag-inline'>snmp_access</code> to deny access for every other IP.
+</p>
+
+<p>Not all Squid SNMP information is confidential. If you want to allow split up SNMP information into <em>public</em> and <em>private</em>, you can use an SNMP-specific acl type to allow or deny requests based on the community the client has requested.
+</p>
+
+<h2>Running multiple SNMP servers on a cache machine</h2>
+<p>If you are running multiple SNMP servers on your cache machine, you probably want to see all the SNMP data returned on one set of graphs or summaries. You don't want to have to query two SNMP servers on the same machine, since many SNMP analysis tools will not allow you to relate (for example) load average to number of requests per second when the SNMP data comes from more than one source.
+</p>
+
+<p>Let's work through the steps Squid goes through when it receives an SNMP query: The request is accepted, and access-control lists are checked. If the request is allowed, Squid checks to see if it's a request for Squid information or a request for something it doesn't understand. Squid handles all Squid-specific queries internally, but all other SNMP requests are simply passed to the other SNMP server; Squid essentially acts as an SNMP proxy for SNMP queries it doesn't understand.
+</p>
+
+<p>This <em>SNMP proxy-mode</em> allows you to run two servers on a machine, but query them both on the same port. In this mode Squid will normally listen on port <em>161</em>, and the other SNMP server is configured to listen on another port (let's use port 3456 for argument's sake). This way the client software doesn't have to be configured to query a different port, which especially helps when the client is not under your control.
+</p>
+
+<h3>Binding the SNMP server to a non-standard port</h3>
+<p>Getting your SNMP server to listen on a different port may be as easy as changing one line in a config file. In the worst case, though, you may have to trick it to listen somewhere else. This section is a bit of a guide to IP server trickery!
+</p>
+
+<p>Server software can either listen for connections on a hard-coded port (where the port to listen to is coded into the source and placed directly into the binary on compilation time), or it can use standard system calls to find the port that it should be listening to. Changing programs that use the second set of options to use a different port is easy: you edit the <em>/etc/services</em> file, changing the value for the appropriate port there. If this doesn't work, it probably means that your program uses hard-coded values, and your only recourse is to recompile from source (if you have it) or speak to your vendor.
+</p>
+
+<p>You can check that your server is listening to the new port by checking the output of the <em>netstat</em> command. The following command should show you if some process is listening for UDP data on port 3456:
+</p>
+<pre><code>
+cache1:~ $ netstat -na | grep udp | grep 3456
+udp 0 0 0.0.0.0:3456 0.0.0.0:*
+cache1:~ $
+</code></pre>
+
+<p>Changing the services port does have implications: client programs (like any SNMP management station software running on the machine) will also use the services file to find out which port they should connect when forming <em>outgoing</em> requests. If you are running anything other than a simple SNMP agent on the cache machine, you must not change the <em>/etc/services</em> file: if you do you will encounter all sorts of strange problems!
+</p>
+
+<p>Squid doesn't use the <em>/etc/services</em> file, but the port to listen to is stored in the standard Squid config file. Once the other server is listening on port 3456, we need to get Squid to listen on the standard SNMP port and proxy requests to port 3456.
+</p>
+
+<p>First, change the <code class='squid-tag-inline'>snmp_port</code> value in <em>squid.conf</em> to 161. Since we are forwarding requests to another SNMP server, we also need to set <code class='squid-tag-inline'>forward_snmpd_port</code> to our other-server port, port 3456.
+</p>
+
+<h3>Access Control with more than one Agent</h3>
+
+<p>Since Squid is actually creating all the queries that reach the second SNMP server, using an IP-based access control system in the second server's config is useless: all requests will come from localhost. Since the second server cannot find out where the requests came from originally, Squid will have to take over the access control functions that were handled by the other server.
+</p>
+
+<p>For the first example, let's assume that you have a single SNMP management station, and you want this machine to have access to all SNMP functions. Here we assume that the management station is at IP 10.0.0.2.
+</p>
+
+<p>You may have classes of SNMP stations too: you may wish some machines to be able to inspect public data, but others are to be considered completely trusted. The special <code class='squid-tag-inline'>snmp_community</code> acl type is used to filter requests by destination community. In the following example all local machines are able to get data in the <em>public</em> SNMP community, but only the snmpManager machine is able to get other information. In this example we are using the <em>AND</em>ing of the <em>publicCommunity</em> and <em>myNet</em> acls to ensure that only people on the local network can get even public information.
+</p>
+
+<h1>Delay Classes</h1>
+<p>Delay Classes are generally used in places where bandwidth is expensive. They let you slow down access to specific sites (so that other downloads can happen at a reasonable rate), and they allow you to stop a small number of users from using all your bandwidth (at the expense of those just trying to use the Internet for work).
+</p>
+
+<p>To ensure that some bandwidth is available for work-related downloads, you can use delay-pools. By classifying downloads into segments, and then allocating these segments a certain amount of bandwidth (in kilobytes per second), your link can remain uncongested for "useful" traffic.
+</p>
+
+<p>To use delay-pools you need to have compiled Squid with the appropriate options: you will have to have used the <em>--enable-delay-pools</em> option when running the <em>configure</em> program back in [[Installing_Squid#Compiling_Squid|Chapter 2]].
+</p>
+
+<h2>Slowing down access to specific URLs</h2>
+<p>An acl-operator (<code class='squid-tag-inline'>delay_access</code>) is used to split requests into pools. Since we are using acls, you can split up requests by source address, destination url or more. There is more than one type (or class) of pool. Each type of pool allows you to limit bandwidth in different ways.
+</p>
+
+<h2>The First Pool Class</h2>
+<p>Rather than cover all of the available classes immediately, let's deal with a basic example first. In this example we have only one pool, and the pool catches all URLs containing the word <em>abracadabra</em>.
+</p>
+
+<pre><code>
+acl magic_words url_regex -i abracadabra
+delay_pool_count 1
+delay_class 1 1
+delay_parameters 1 16000/16000
+delay_access 1 allow magic_words
+</code></pre>
+
+<p>The first line is a standard ACL: it returns <em>true</em> if the requested URL has the word abracadabra in it. The <em>-i</em> flag is used to make the search case-insensitive.
+</p>
+
+<p>The <code class='squid-tag-inline'>delay_pool_count</code> variable tells Squid how many delay pools there will be. Here we have only one pool, so this option is set to 1.
+</p>
+
+<p>The third line creates a delay pool (delay pool number <em>1</em>, the first option) of class 1 (the second option to <code class='squid-tag-inline'>delay_class</code>).
+</p>
+
+<p>The first delay <em>class</em> is the simplest: the download rate of all connections in the class are added together, and Squid keeps this <em>aggregate</em> value below a given maximum value.
+</p>
+
+<p>The fourth line is the most complex, as if you can see. The <code class='squid-tag-inline'>delay_parameters</code> option allows you to set speed limits on each pool. The first option is the pool to be manipulated: since we have only one pool in this example, this is set to 1. The second option consists of two values: the <em>restore</em> and <em>max</em> values, separated by a forward-slash (/).
+</p>
+
+<p>If you download a short file at high speed, you create a so-called <em>burst</em> of traffic. Generally these short bursts of traffic are not a problem: these are normally html or text files, which are not the real bandwidth consumers. Since we don't want to slow everyone's access down (just the people downloading comparitively large files), Squid allows you to configure a size that the download is to start slowing down at. If you download a short file, it arrives at full speed, but when you hit a certain threshold the file arrives more slowly.
+</p>
+
+<p>The <em>restore</em> value is used to set the download speed, and the <em>max</em> value lets you set the size at which the files are to be slowed down from. <em>Restore</em> is in bytes per second, <em>max</em> is in bytes.
+</p>
+
+<p>In the above example, downloads proceed at full speed until they have downloaded 16000 bytes. This limit ensures that small file arrive reasonably fast. Once this much data has been transferred, however, the transfer rate is slowed to 16000 bytes per second. At 8 bits per byte this means that connections are limited to 128kilobits per second (16000 * 8).
+</p>
+
+<h2>The Second Pool Class</h2>
+<p>As I discussed in this section's introduction, delay pools can help you stop one user from flooding your links with downloads. You could place each user in their own pool, and then set limits on a per-user basis, but administrating these lists would become painful almost immediately. By using a different pool type, you can set rate limits <em>by IP address</em> easily.
+</p>
+
+<p>Let's consider another example: you have a 128kbit per second line. Since you want some bandwidth available for things like SMTP, you want to limit web access to 100kbit per second. At the same time, you don't want a single user to use more than their fair share of sustained bandwidth. Given that you have 20 staff members, and 100kbit per second remaining bandwidth, each person should not use more than 5kbit per second of bandwidth. Since it's unlikely that every user will be surfing at once, we can probably limit people to about four times their limit (that's 20kbit per second, or 2.5kbytes per second).
+</p>
+
+<p>In the following example, we change the delay class for pool 1 to 2. Delay class 2 allows us to specify both an aggregate (overall) bandwidth usage and a per-user usage. In the previous example the <code class='squid-tag-inline'>delay_paramaters</code> tag only took one set of options, the aggregate peak and burst rates. Given that we are now using a class-two pool, we have to supply two sets of options to <code class='squid-tag-inline'>delay_parameters</code>: the overall speed and the per-IP speed. The 100kbits per second value is converted to bytes per second by dividing by 8 (giving us the 12500 values), and the per-IP value of 2.5kbits per second we discovered is converted to bytes per second (giving us the 2500 values.)
+</p>
+
+<p>EXAMPLE:
+</p>
+<pre><code>
+acl all src 0.0.0.0/0.0.0.0
+delay_pool_count 1
+delay_class 1 2
+delay_parameters 1 12500/12500 2500/2500
+delay_access 1 allow all
+</code></pre>
+
+<h2>The Third Pool Class</h2>
+<p>This class is useful to very organisations like universities. The second pool class lets you stop individual users from flooding your links. A lab full of students all operating at their maximum download rate can, however, still flood the link. Since such a lab (or department, if you are not at a University) will all have IP addresses in the same range, it is useful to be able to put a cap on the download rate of an entire network range. The third pool class lets you do this. Currently this option only works on class-C network ranges, so if you are using variable length subnet masks then this will not help.
+</p>
+
+<p>In the next example we assume that you have three IP ranges. Each range must not use more than 1/3 of your available bandwidth. For this example I am assuming that you have a 512kbit/s line, and you want 64kbit/s available for SMTP and other protocols. This will leave you with an overall download rate cap of 448kbit/s.) Each Class-C IP range will have about 150kbit/s available. With 3 ranges of 256 IP addresses each, you should have in the region of 500 pc's, which (if calculated exactly) gives you .669kbit per second per machine. Since it is unlikely that all machines will be using the net at the same time, you can probably allocate each machine (say) 4kbit per second (a mere 500 bytes per second).
+</p>
+
+<p>In this example, we changed the delay class of the pool to <em>3</em>. The <code class='squid-tag-inline'>delay_parameters</code> option now takes four arguments: the pool number; the overall bandwidth rate; the per-network bandwidth rate and the per-user bandwidth rate.
+</p>
+
+<p>The 4kbit per second limit for users seems a little low. You can increase the per-user limit, but you may find that it's a better idea to change the <em>max</em> value instead, so that the limit sets in after only (say) 16kilobytes or so. This will allow small pages to be downloaded as fast as possible, but large pages will be brought down without influencing other users.
+</p>
+
+<p>If you want, you can set the per-user limit to something quite high, or even set them to <em>-1</em>, which effectively means that there is no limit. Limits work from right to left, so if I user is sitting alone in a lab they will be limited by their per-user speed. If this value is undefined, they are limited by their per-network speed, and if that is undefined then they are limited by their overall speed. This means that you can set the per-user limit higher than you would expect: if the lab is not busy then they will get good download rates (since they are only limited by the per-network limit).
+</p>
+
+<p>EXAMPLE:</p>
+<pre><code>
+acl all src 0.0.0.0/0.0.0.0
+delay_pool_count 1
+delay_class 1 3
+# 56000*8 sets your overall limit at 448kbit/s
+# 18750*8 sets your per-network limit at 150kbit/s
+# 500*8 sets your per-user limit at 4kbit/s
+delay_parameters 1 56000/56000 18750/18750 500/500
+delay_access 1 allow all
+</code></pre>
+
+<h2>Using Delay Pools in Real Life</h2>
+<p>By combining multiple ACLs, you can do interesting things with delay pools. Here are some examples:</p>
+
+<ul>
+<li>By using time-based acls, you can limit people's speed during working hours, but allow them full-speed access outside hours.</li>
+<li>Again (with time-based acl lists), you can allocate a very small amount of bandwidth to http during working hours, discouraging people from browsing the Web during office hours.</li>
+<li>By using acls that match specific source IP addresses, you can ensure that sibling caches have full-speed access to your cache.</li>
+<li>You can prioritize access to a limited set of destination sites by using the <em>dst</em> or <em>dstdomain</em> acl types by inverting the rules we used to slow access to some sites down.</li>
+<li>You can combine username/password access-lists and speed-limits. You can, for example. allow users that have not logged into the cache access to the Internet, but at a much slower speed than users who have logged in. Users that are logged in get access to dedicated bandwidth, but are charged for their downloads.</li>
+</ul>
+
+<h1>Conclusion</h1>
+<p>Once your acl system is correctly set up, your cache should essentially be ready to become a functional part of your infrastructure. If you are going to use some of the advanced Squid features (like transparent operation mode, for example),
+</p>

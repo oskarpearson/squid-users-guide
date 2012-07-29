@@ -1,0 +1,433 @@
+<h1>Configuration Basics</h1>
+
+<p>For Squid, the default configuration file is probably right for 90% of installations - once you have Squid running, you should change the configuration file one option at a time. Don't get over-ambitious in your changes quite yet! Leave things like refresh rules until you have experimented with the basic options - what port you want to accept your requests on, what user to run as, and where to keep cached pages on your drives.
+</p>
+
+<p>So that you can get Squid running, this chapter works through the basic Squid options, giving you background information and introducing you to some of the basic concepts. In later chapters you'll move on to more advanced topics.
+</p>
+
+<p>The Squid config file is not arranged in the same order as this book. The config file also does not progress from basic to advanced config options in any specific order, but instead consists of related sections, with all hierarchy settings in a specific section of the file, all access controls in another and so forth.
+</p>
+
+<p>To make changes detailed in this chapter you are going to have to skip around in the config file a bit. It's probably easiest to simply search for the options discussed in each subsection of this chapter, but if you have some time it will be best if you read through the config file, so that you have an idea of how sections fit together.
+</p>
+
+<p>The chapter also points out options that may have to be changed on the <em>other 10%</em> of machines. If you have a firewall, for example, you will almost certainly have to configure Squid differently to someone that doesn't.
+</p>
+
+<h1>Version Control Systems</h1>
+<p>I recommend that you put all Squid configuration files and startup scripts under revision control. If you are like me, you love to <em>play</em> with new software. You change an option, get the program to re-read the configuration file, and see what difference it makes. By repeating this process, I learn what each option does, and at the same time I gain experience, and discover why the program is written the way it is. Quite often configuration files make no sense until you discover the overall structure of the underlying program.
+</p>
+
+<p>The best way for you to understand each of the options in the Squid config file (and to understand Squid itself) is to experiment with the multitude of options. At some stage in the experimentation stage, you will find that you break something. It's useful to be able to revert to a previous version (or simply to be reminded what changes you have made).
+</p>
+
+<p>Many readers will already have used a Revision Control System. The RCS system is included with many Unix systems, and source is freely available. For the few that haven't used RCS, however, it's worth including some pointers to some manual pages:
+</p>
+<ul>
+<li>ci(1)</li>
+<li>co(1)</li>
+<li>rcs(1)</li>
+<li>rcsdiff(1)</li>
+<li>rlog(1)</li>
+</ul>
+
+<p>One of the wonders of Unix is the ability to create scripts which reduce the number of commands that you have to type to get something done. I have a short script on all the machines I maintain called <em>rvi</em>. Using <em>rvi</em> instead of <em>vi</em> allows me to use one command to edit files under RCS (as opposed to the customary four). Put this file somewhere in your path and make it executable <em>chmod +x rvi</em>. You can then simply use a command like <em>rvi squid.conf</em> to edit files that are under revision control. This is a lot quicker than running each of the <em>co</em>, <em>rcsdiff</em> and <em>ci</em> commands. 
+</p>
+
+<pre><code>
+#!/bin/sh
+co -l $1
+$VISUAL $1
+rcsdiff -u $1
+ci -u $1
+</code></pre>
+
+<h1>The Configuration File</h1>
+<p>All Squid configuration files are kept in the directory <em>/usr/local/squid/etc</em>. Though there is more than one file in this directory, only one file is important to most administrators, the <em>squid.conf</em> file. Though there are (as of this writing) 125 option tags in this file, you should only need to change eight options to get Squid up and running. The other 117 options give you amazing flexibility, but you can learn about them once you have Squid running, by <em>playing</em> with the options or by reading up the detailed descriptions at the <a href='http://www.squid-cache.org/Doc/config/'>squid configuration-parameter guide</a>.
+</p>
+
+<p>Squid assumes that you wish to use the default value if there is no occurrence of a tag in the <em>squid.conf</em> file. Theoretically, you could even run Squid with a zero length configuration file.
+</p>
+
+<p>The remainder of this chapter works through the options that you may need to change to get Squid to run. Most people will not need to change all of these settings. You will need to change at least one part of the configuration file though: the default <em>squid.conf</em> denies access to all browsers. If you don't change this, Squid will not be very useful!
+</p>
+
+<h1>Setting Squid's HTTP Port</h1>
+<p>The first option in the <em>squid.conf</em> file sets the HTTP port(s) that Squid will listen to for incoming requests.
+</p>
+
+<p>Network services listen on particular ports. Ports below 1024 can only be used by the system administrator, and are used by programs that provide basic Internet services: SMTP, POP, DNS and HTTP (web). Ports above 1024 are used for untrusted services (where a service does not run as administrator), and for transient connections, such as outgoing data requests.
+</p>
+
+<p>Typically, web servers listen for incoming web requests (using the HyperText Transfer Protocol - HTTP) on port 80.
+</p>
+
+<p>Squid's default HTTP port is <em>3128</em>. Many people run their cache servers on a port which is easier to remember: something like <em>80</em> or <em>8080</em>). If you choose a low-numbered port, you will have to start Squid as root (otherwise you are considered <em>untrusted</em>, and you will not be able to start Squid). Many ISPs use port 8080, making it an accepted <em>pseudo-standard</em>.
+</p>
+
+<p>If you wish, you can use multiple ports appending a second port number to the <code class='squid-tag-inline'>http_port</code> variable. Here is an example:</p>
+<pre><code>http_port 3128 8080</code></pre>
+
+<p>It is very important to refer to your cache server with a generic DNS name. Simply because you only have one server now does not mean that you should not plan for the future. It is a good idea to setup a DNS hostname for your proxy server. Do this right away! A simple DNS entry can save many hours further down the line. Configuring client machines to access the cache server by IP address is asking for a long, painful transition down the road. Generally people add a hostname like <em>cache.mydomain.com</em> to the DNS. Other people prefer the name <em>proxy</em>, and create a name like <em>proxy.mydomain.com</em>.
+</p>
+
+<h2>Using Port 80</h2>
+<p>HTTP defines the format of both the request for information and the format of the server response. The basic aspects of the protocol are quite straight forward: a client (such as your browser) connects to port 80 and asks for the file by supplying the full path and filename that it wishes to download. The client also specifies the version of the HTTP protocol it wishes to use for the retrieval.
+</p>
+<p>With a proxy request the format is only a little different. The client specifies the whole URL instead of just the path to the file. The proxy server then connects to the web server specified in the URL, and sends a normal HTTP request for the page. <!-- The format of HTTP requests is described in more detail in [[Starting Squid|chapter 4]], where you type in an HTTP request, just as a browser would send it to test that the cache is responding to requests - may use the 'client' program instead. -->
+</p>
+
+<p>Since the format of proxy requests is so similar to a normal HTTP request, it is not especially surprising that many web servers can function as proxy servers too. Changing a web server program to function as a proxy normally involves comparatively small changes to the code, especially if the code is written in a modular manner - as is the Apache web server. In many cases the resulting server is not as fast, or as configurable, as a dedicated cache server can be.
+</p>
+
+<p>The CERN web server <em>httpd</em> was the first widely available web proxy server. The whole WWW system was initially created to give people easy access to CERN data, and CERN HTTPD was thus the de-facto test-bed for new additions to the initial informal HTTP specification. Most (and certainly at one stage <em>all</em>) of the early web sites ran the CERN server. Many system administrators who wanted a proxy server simply used their standard CERN web server (listening on port 80) as their proxy server, since it could function as one. It is easy for the web server to distinguish a web site request from a normal web page request, since it simply has to check if the full URL is given instead of simply a path name. Given the choice (even today) many system administrators would choose port 80 as their proxy server port simply as 'port 80 is the standard port for web requests'.
+</p>
+
+<p>There are, however, good reasons for you to choose a port <em>other than</em> 80.
+</p>
+
+<p>Running both services on the same port meant that if the system administrator wanted to install a different web server package (for extra features available in the new software) they would be limited to software that could perform both as a web server and as a proxy. Similarly, if the same sysadmin found that their web server's low-end proxy module could not handle the load of their ever-expanding local client base, they would be restricted to a proxy server that could function as a web server. The only other alternative is to re-configure all the clients, which normally involves spending a few days apologizing to users and helping them through the steps involved in changing over.
+</p>
+
+<p>Microsoft use the Microsoft web server (IIS) as a basis for their proxy server component, and Microsoft proxy thus only <!-- tried once - let's see if it's changed since --> accepts incoming proxy request on port 80. If you are installing a Squid system to replace either CERN, Apache or IIS running in both web-server and cache-server modes on the same port, you will have to set <code class='squid-tag-inline'>http_port</code> to 80. Squid is written only as a high-performance proxy server, so there is no way for it to function as a web server, since Squid has no support for reading files from a local disk, running CGI scripts and so forth. There is, however, a workaround.
+</p>
+
+<p>If you have both services running on the same port, and you cannot change your client PCs, do not despair. Squid can accept requests in web-server format and forward them to another server. If you have only one machine, and you can get your web server software to accept incoming requests on a non-default port (for example 81), Squid can be configured to forward incoming web requests to that port. This is called <em>accelerator mode</em> (since its initial purpose was to speed up very slow web servers). Squid effectively does some translation on the original request, and then simply acts as if the request were a proxy request and connects to the host: the fact that it's not a remote host is irrelevant. Accelerator mode is discussed in more detail in [[Transparent Caching/Proxy|chapter 9]]. Until then, get Squid installed and running on another port, and work your way through the first couple of chapters of this book, until you have a working pilot-phase system. Once Squid is stable and tested you can move on to changing web server settings. If you feel adventurous, however, you can skip there shortly!
+</p>
+
+<h1>Where to Store Cached Data</h1>
+<p>Cached Data has to be kept somewhere. In the section on hardware sizing, we discussed the size and number of drives to use for caching. Squid cannot autodetect where to store this data, though, so you need to let Squid know which directories it can use for data storage.
+</p>
+
+<p>The <code class='squid-tag-inline'>cache_dir</code> operator in the <em>squid.conf</em> file is used to configure specific storage areas. If you use more than one disk for cached data, you may need more than one mount point (for example <em>/usr/local/squid/cache1</em> for the first disk, <em>/usr/local/squid/cache2</em> for the second). Squid allows you to have more than one <code class='squid-tag-inline'>cache_dir</code> option in your config file.
+</p>
+
+<p>Let's consider only one <code class='squid-tag-inline'>cache_dir</code> entry in the meantime. Here I am using the default values from the standard <em>squid.conf</em>.
+</p>
+<pre><code>cache_dir ufs /usr/local/squid/var/cache/ 100 16 256</code></pre>
+
+<p>The first option to the <code class='squid-tag-inline'>cache_dir</code> tag sets the directory where data will be stored. The prefix value simply has <em>/cache/</em> tagged onto the end and it's used as the default directory. This directory is also made by the <em>make install</em> command that we used earlier.
+</p>
+
+<p>The next option to <code class='squid-tag-inline'>cache_dir</code> is straight forward: it's a size value. Squid will store up to that amount of data in that directory. The value is in megabytes, so of the cache store. The default is 100 megabytes.
+</p>
+
+<p>The other two options are more complex: they set the number of subdirectories (first and second tier) to create in this directory. Squid makes lots of directories and stores a few files in each of them in an attempt to speed up disk access (finding the correct entry in a directory with one million files in it is not efficient: it's better to split the files up into lots of smaller sets of files... don't worry too much about this for the moment). I suggest that you use the default values for these options in the mean time: if you have a very large cache store you may want to increase these values, but this is covered in the section on FIXME
+</p>
+
+<h1>Email for the Cache Administrator</h1>
+
+<p>If Squid dies, an email is sent to the address specified with the <code class='squid-tag-inline'>cache_mgr</code> tag. This address is also appended to the end of error pages returned to users if, for example, the remote machine is unreachable.
+</p>
+
+<h1>Logging</h1>
+
+<p>Logging is fairly straight forward. The default squid.conf defines a useful selection of logformats.
+</p>
+
+<p>Using <code class='squid-tag-inline'>access_log</code> tag you specify where to log, and the format to log in.
+</p>
+
+<p>The directives for logging have been renamed between versions.
+</p>
+
+<p><code class='squid-tag-inline'>cache_access_log</code> became <code class='squid-tag-inline'>access_log</code> and gained an optional logformat option.
+</p>
+
+<p>The old <code class='squid-tag-inline'>useragent_log</code> and <code class='squid-tag-inline'>referer_log</code> directives are supported if squid is compiled with the appropriate compiler flags. Some distributions (Debian) ship squid (3) with these options disabled.
+</p>
+
+<p>The "combined" logformat, which mimics the Apache combined log file format as it includes referer and User-agent information as well as appending the Squid specific information, makes a good choice for many installations, as it is compatible with many Apache log tools. Although administrators may want to check out that their preferred squid logfile tools work with that format.
+</p>
+
+<p>Example config file entry:</p>
+<pre><code>access_log /var/log/squid/access.log combined</code></pre>
+
+
+<h1>Effective User and Group ID</h1>
+
+<p>Squid can only bind to low numbered ports (such as port 80) if it is started as root. Squid is normally started by your system's rc scripts when the machine boots. Since these scripts run as root, Squid is started as root at bootup time.
+</p>
+
+<p>Once Squid has been started, however, there is no need to run it as root. Good security practice is to run programs as root only when it's absolutely necessary, and for this reason Squid changes user and group ID's once it has bound to the incoming network port.
+</p>
+
+<p>The <code class='squid-tag-inline'>cache_effective_user</code> and <code class='squid-tag-inline'>cache_effective_group</code> tags tell Squid what ID's to change to. The Unix security system would be useless if it allowed all users to change their ID's at will, so Squid only attempts to change ID's if the main program is started as root.
+</p>
+
+<p>If you do not have root access to the machine, and are thus not starting Squid as root, you can simply leave this option commented out. Squid will then run with whatever user ID starts the actual Squid binary.
+</p>
+
+<p>As discussed in [[Installing Squid|chapter 2]], this book assumes that you have created both a squid user and a squid group on your cache machine. The above tags should thus both be set to "squid".
+</p>
+
+<h2>FTP login information</h2>
+<p>Squid can act as a proxy server for various Internet protocols. The most commonly used protocol is HTTP, but the File Transfer Protocol (FTP) is still alive and well.
+</p>
+
+<p>FTP was written for authenticated file transfer (it requires a username and password). To provide public access, a special account is created: the <em>anonymous</em> user. When you log into an FTP server you use this as your username. As a password you generally use your email address. Most browsers these days automatically enter a useless email address.
+</p>
+
+<p>It's polite to give an address that works, though. If one of your users abuses a site, it allows the site admin get hold of you easily.
+</p>
+
+<p>Squid allows you to set the email address that is used with the <code class='squid-tag-inline'>ftp_user</code> tag. You should probably create a <em>squid@yourdomain.example</em> email address specifically for people to contact you on.
+</p>
+
+<p>There is another reason to enter a proper address here: some servers <em>require</em> a real email address. For your proxy to log into these ftp servers you will have to enter a real email address here.
+</p>
+
+<h1>Access Control Lists and Access Control Operators</h1>
+<p>Squid could not be used in an ISP environment without a sophisticated access control system. Indeed, Squid should not be used in ANY environment without some kind of basic authentication system. It is amazing how fast other Internet users will find out that they can relay requests through your cache, and then proceed to do so.
+</p>
+
+<p>Why? Sometimes to obfuscate their real identity, and other times since they have a fast line to you, but a slow line to the remainder of the Internet.
+</p>
+
+<h2>Simple Access Control</h2>
+<p>In many cases only the most basic level of access control is needed. If you have a small network, and do not wish to use things like user/password authentication or blocking by destination domain, you may find that this small section is sufficient for all your access control setup. If not, you should read [[Access Control and Access Control Operators|chapter 7]], where access control is discussed in detail.
+</p>
+
+<p>The simplest way of restricting access is to only allow IPs that are on your network. If you wish to implement different access control, it's suggested that you put this in place later, after Squid is running. In the meantime, set it up, but only allow access from your PC's IP address.
+</p>
+
+<p>Example access control entries are included in the default <em>squid.conf</em>. The included entries should help you avoid some of the more obscure problems, such as bandwidth-chewing loops, cache tunneling with SSL CONNECTs and other strange access problems. In [[Access Control and Access Control Operators|chapter 7]] we work through the config file's default config options, since some of them are pretty complex.
+</p>
+
+<p>Access control is done on a per-protocol basis: when Squid accepts an HTTP request, the list of HTTP controls is checked. Similarly, when an ICP request is accepted, the ICP list is checked before a reply is sent.
+</p>
+
+<p>Assume that you have a list of IP addresses that are to have access to your cache. If you want them to be able to access your cache with both HTTP and ICP, you would have to enter the list of IP addresses twice: you would have lines something like this:
+</p>
+
+<pre><code>
+acl localnet src 192.168.1.0/255.255.255.0
+..
+http_access allow  localnet 
+icp_access  allow  localnet
+</code></pre>
+
+<p>Rule sets like the above are great for small organisations: they are straightforward. Note that as <code class='squid-tag-inline'>http_access</code> and <code class='squid-tag-inline'>icp_access</code> rules are processed in the order they appear in the file, you will need to place the <code class='squid-tag-inline'>http_access</code> and <code class='squid-tag-inline'>icp_access</code> entries as is appropriate.
+</p>
+
+<p>For large organizations, though, things are more convenient if you can create classes of users. You can then allow or deny classes of users in more complex relationships. Let's look at an example like this, where we duplicate the above example with classes of users:
+</p>
+
+<p>Sure, it's more complex for this example. The benefits only become apparent if you have large access lists, or when you want to integrate refresh-times (which control how long objects are kept) and the sources of incoming requests. I am getting quite far ahead of myself, though, so let's skip back.
+</p>
+
+<p>We need some terminology to discuss access control lists, otherwise this could become a rather long chapter. So: lines beginning with <em>acl</em> are (appropriately, I believe) <em>acl</em> lines. The lines that use these acls (such as <code class='squid-tag-inline'>http_access</code> and <code class='squid-tag-inline'>icp_access</code> in the above example) are called <em>acl-operators</em>. An acl-operator can either allow or deny a request.
+</p>
+
+<p>So, to recap: <strong>acls</strong> are used to define classes. When Squid accepts a request it checks the list of <em>acl-operators</em> specific to the type of request: an HTTP request causes the <code class='squid-tag-inline'>http_access</code> lines to be checked; an ICP request checks the <code class='squid-tag-inline'>icp_access</code> lists.
+</p>
+
+<p>Acl-operators are checked in the order that they occur in the file (ie from top to bottom). The first acl-operator line that matches causes Squid to <em>drop out</em> of the acl list. Squid will not check through all acl-operators if the first denies the request.
+</p>
+
+<p>In the previous example, we used a <em>src</em> acl: this checks that the source of the request is within the given IP range. The src acl-type accepts IP address lists in many formats, though we used the subnet/netmask in the earlier example. CIDR (Classless Internet Domain Routing) notation can also be used here. Here is an example of the same address range in either notation:
+</p>
+<p>
+ CIDR: 192.168.1.0/24<br/>
+ Subnet/Netmask (Dot Notation): 192.168.1.0/255.255.255.0
+</p>
+
+<p>Access control lists inherit permissions when there is no matching acl If all acl-operators in the file are checked, and no match is found, the last acl-operator checked determines whether the request is allowed or denied. This can be confusing, so it's normally a good idea to place a final catch-all acl-operator at the end of the list. The simplest way to create such an operator is to create an acl that matches any IP address. This is done with a src acl with a netmask of all 0's. When the netmask arithmetic is done, Squid will find that any IP matches this acl.
+</p>
+
+<p>Your cache server may well be on the network placed in the relevant allow lists on your cache, and if you were thus to run the client on the cache machine (as opposed to another machine somewhere on your network) the above acl and <code class='squid-tag-inline'>http_access</code> rules would allow you to test the cache. In many cases, however, a program running on the cache server will end up connecting to (and from) the address '127.0.0.1' (also known as localhost). Your cache should thus allow requests to come from the address 127.0.0.1/255.255.255.255. In the below example we don't allow icp requests from the localhost address, since there is no reason to run two caches on the same machine.
+</p>
+
+<p>The squid.conf file that comes with Squid includes acls that deny all HTTP requests. To use your cache, you need to explicitly allow incoming requests from the appropriate range. The squid.conf file includes text that reads:
+</p>
+<pre><code>
+#
+# INSERT YOUR OWN RULE(S) HERE TO ALLOW ACCESS FROM YOUR CLIENTS
+#
+</code></pre>
+
+<p>To allow your client machines access, you need to add rules similar to the below in this space. The default access-control rules stop people exploiting your cache, it's best to leave them in.
+</p>
+
+<h2>Ensuring Direct Access to Internal Machines</h2>
+<p>Acl-operator lines are not only used for authentication. In an earlier section we discussed communication with other cache servers. Acl lines are used to ensure that requests for specific URLs are handled by your cache, not passed on to another (further away) cache.
+</p>
+
+<p>If you don't have a parent cache (a firewall, or you have a parent ISP cache) you can probably skip this section.
+</p>
+
+<p>Let's assume that you connect to your ISP's cache server as a parent. A client machine (on your local network) connects to your cache and requests <em>http://www.yourdomain.example/</em>. Your cache server will look in the local cache store. If the page is not there, Squid will connect to its configured parent (your ISP's cache: across your serial link), and request the page from there. The problem, though, is that there is no need to connect across your internet line: the web server is sitting a few feet from your cache in the machine room.
+</p>
+
+<p>Squid cannot know that it's being very inefficient unless you give it a list of sites that are "near by". This is not the only way around this problem though: your browser could be configure to ignore the cache for certain IPs and domains, and the request will never reach the cache in the first place. Browser config is covered in [[Browser Configuration|Chapter 5]], but in the meantime here is some info on how to configure Squid to communicate directly with internal machines.
+</p>
+
+<p>The acl-operators <code class='squid-tag-inline'>always_direct</code> and <code class='squid-tag-inline'>never_direct</code> determine whether to pass the connection to a parent or to proceed directly.
+</p>
+
+<p>The following is a set of operators are based on the final configuration created in the previous section, but using <code class='squid-tag-inline'>never_direct</code> and <code class='squid-tag-inline'>always_direct</code> operators. It is assumed that all servers that you wish to connect to directly are in the address ranges specified in with the my-iplist directives. In some cases you may run a web server on the same machine as the cache server, and the localhost acl is thus also considered local.
+</p>
+
+<p>The <code class='squid-tag-inline'>always_direct</code> and <code class='squid-tag-inline'>never_direct</code> tags are covered in more detail in [[Cache Hierarchies|Chapter 7]], where we cover hierarchies in detail.
+</p>
+
+<p>Squid always attempts to cache pages. If you have a large Intranet system, it's a waste of cache store disk space to cache your Intranet. Controlling which URLs and IP ranges not to cache are covered in detail in [[Access Control and Access Control Operators|chapter 6]], using the <code class='squid-tag-inline'>no_cache</code> acl operator.
+</p>
+
+<h1>Communicating with other proxy servers</h1>
+<p>Squid supports the concept of a <em>hierarchy</em> of proxies. If your proxy does not have an object on disk, its default action is to connect to the origin web server and retrieve the page. In a hierarchy, your proxy can communicate with other proxies (in the hope that one of these servers will have the relevant page). You will, obviously, only peer with servers that are 'close' to you, otherwise you would end up slowing down access. If access to the origin server is faster than access to neighboring cache servers it is not a good idea to get the page from the slower link!
+</p>
+
+<p>Having the ability to treat other caches as siblings is very useful in some interactions. For example: if you often do business with another company, and have a permanent link to their premises, you can configure your cache to communicate with their cache. This will reduce overall latency: it's almost certainly faster to get the page from them than from the other side of the country.
+</p>
+
+<p>When querying more than one cache, Squid does not query each in turn, and wait for a reply from the first before querying the second (since this would create a linear slowdown as you add more siblings, and if the first server stops responding, you would slow down all incoming requests). Squid thus sends all ICP queries together - without waiting for replies. Squid then puts the client's request on hold until the first positive reply from a sibling cache is received, and will retrieve the object from the fastest-replying cache server. Since the earliest returning reply packet is usually on the fastest link (and from the least loaded sibling server), your server gets the page fast.
+</p>
+
+<p>Squid will always get the page from the fastest-responding cache - be it a parent or a sibling.
+</p>
+
+<p>The <code class='squid-tag-inline'>cache_peer</code> option allows you to specify proxy servers that your server is to communicate with. The first line of the following example configures Squid to query the cache machine <em>cache.myparent.example</em> as a parent. Squid will communicate with the parent on HTTP port 3128, and will use ICP to query the server using port 3130. Configuring Squid to query more than one server is easy: simply add another <code class='squid-tag-inline'>cache_peer</code> line. The second line configures cache.sibling.example as a sibling, listening for HTTP request on port 8080 and ICP queries on port 3130.
+</p>
+<pre><code>
+cache_peer cache.myparent.example parent 3128 3130
+cache_peer cache.sibling.example sibling 8080 3130
+</code></pre>
+
+<p>If you do not wish to query any other caches, simply leave all <code class='squid-tag-inline'>cache'_peer</code> lines commented out: the default is to talk directly to origin servers.
+</p>
+
+<p>Cache peering and hierarchy interactions are discussed in quite some detail in this book. In some cases hierarchy setups are the most difficult part of your cache setup process (especially in a distributed environment like a nationwide ISP). In depth discussion of hierarchies is beyond the scope of this chapter, so much more information is given in [[Accelerator Mode|chapter 8]]. There are cases, where you need at least one hierarchy line to get Squid to work at all. This section covers the basics, just for those setups.
+</p>
+
+<p>You only need to read this material if one of the following scenarios applies to you:
+</p>
+<ul>
+<li>You have to use your Internet Service Provider's cache.</li>
+<li>You have a firewall.</li>
+</ul>
+
+<h2>Your ISP's cache</h2>
+<p>If you <em>have</em> to use your Internet Service Provider's cache, you will have to configure Squid to query that machine as a parent. Configuring their cache as a sibling would probably return error pages for every URL that they do not already have in their cache.
+</p>
+
+<p>Squid will attempt to contact parent caches with ICP for each request. This is essentially a <em>ping</em>. If there is no response to this request, Squid will attempt to go direct to the origin server. since (in this case, at least) you cannot bypass your ISP's cache, you may want to reduce the latency added by this extra query. To do this, place the <em>default</em> and <code class='squid-tag-option-inline'>no-query</code> keywords at the end of your <code class='squid-tag-inline'>cache_peer</code> line:
+</p>
+<pre><code>cache_peer cache.myisp.example parent 3128 3130 default no-query</code></pre>
+
+<p>The <em>default</em> option essentially tells Squid "Go through this cache for all requests. If it's down, return an error message to the client: you cannot go direct".
+</p>
+
+<p>The <code class='squid-tag-option-inline'>no-query</code> option gets Squid to ignore the given ICP port (leaving the port number out will return an error), and never to attempt to query the cache with ICP.
+</p>
+
+<h2>Firewall Interactions</h2>
+<p>Firewalls can make cache configuration hairy. Inter-cache protocols generally use packets which firewalls inherently distrust. Most caches (Squid included) use ICP, which is a layer on top of UDP. UDP is difficult to make secure, and firewall administrators generally disable it if at all possible.
+</p>
+
+<p>It's suggested that you place your cache server on your DMZ (if you have one). There are a few advantages to this:
+</p>
+<ul>
+<li>Your cache server is kept secure.</li>
+<li>The firewall can be configured to <em>hand off</em> requests to the cache server, assuming it is capable.</li>
+<li>You will be able to peer with other, outside, caches (like your ISP's), since DMZ networks generally have less rigid rule sets.</li>
+</ul>
+
+<p>The remainder of this section should help you getting Squid and your firewall to co-operate. A few cases are covered for each type of firewall: the cache inside the firewall; the cache outside the firewall; and, finally, on the DMZ.
+</p>
+
+<h3>Proxying Firewalls</h3>
+<p>The vast majority of firewalls know nothing about ICP. If, on the other hand, your firewall does not support HTTP, it's a good time to have a serious talk to the buyer that had an all-expenses-paid weekend on the firewall supplier. Configuring the firewall to understand ICP is likely to be painful, but HTTP should be easy.
+</p>
+
+<p>If you are using a proxy-level firewall, your client machines are probably configured to use the firewall's internal IP address as their proxy server. Your firewall could also be running in <em>transparent</em> mode, where it automatically picks up outgoing web requests. If you have a fair number of client machines, you may not relish the idea of reconfiguring all of them. If you fall into this category, you may wish to put Squid on the outside (or on the DMZ) and configure the firewall to pass requests to the cache, rather than reconfiguring all client machines.
+</p>
+
+<h4>Inside</h4>
+<p>The cache is considered a trusted host, and is protected by the firewall. You will configure client machines to use the cache server in their browser proxy settings, and when a request is made, the cache server will pass the outgoing request to a firewall, treating the firewall as a <em>parent</em> proxy server. The firewall will then connect to the destination server. If you have a large number of clients configured to use the firewall as their proxy server, you could get the firewall to hand-off incoming HTTP requests back into the network, to the cache server. This is less efficient though, since the cache will then have to re-pass these requests through the firewall to get to the outside, using the parent option to <code class='squid-tag-inline'>cache_peer</code>. Since the latter involves traffic passing through the firewall twice, your load is very likely to increase. You should also beware of loops, with the cache server parenting to the firewall and the firewall <em>handing-off</em> the cache's request back to the cache!
+</p>
+
+<p>As described in chapter 1, Squid will also send ICP queries to parents. Firewalls don't care for UDP packets, and normally log (and then discard) such packets.
+</p>
+
+<p>When Squid does not receive a response from a configured parent, it will mark the parent as down, and proceed to go directly.
+</p>
+
+<p>Whenever Squid is setup to use a parent that does not support ICP, the <code class='squid-tag-inline'>cache_peer</code> line should include the "default" and "no-query" options. These options stop Squid from attempting to go direct when all caches are considered down, and specify that Squid is not to send ICP requests to that parent.
+</p>
+
+<p>Here is an example config entry:</p>
+<pre><code>cache_peer inside.fw.address.domain parent 3128 3130 default no-query</code></pre>
+
+<h4>Outside</h4>
+<p>There are only two major reasons for you to put your cache outside the firewall:</p>
+
+<ol>
+<li>Although squid can be configured to do authentication, this can lead to the duplication of effort (you will encounter the "add new staff to 500 servers" syndrome). If you want to continue to authenticate users on the firewall, you will have to put your cache on the outside or on the DMZ. The firewall will thus accept requests from clients, authenticate them, and then pass them on to the cache server.</li>
+<li>Communicating with cache hierarchies is easy. The cache server can communicate with other systems using any protocol. Sibling caches, for example, are difficult to contact through a proxying firewall.</li>
+</ol>
+
+<p>You can <em>only</em> place your cache outside if your firewall supports hand-offs. Browsers inside will connect to the firewall and request a URL, and the firewall will connect to the outside cache and request the page.</p>
+
+<p>If you place your cache outside your firewall, you may find that your client PCs have problems connecting to internal web servers (your intranet, for example, may be unreachable). The problem is that the cache is unable to connect back through to your internal network (which is actually a good thing: don't change that). The best thing to do here is to add exclusions to your browser settings: this is described in Chapter 5 - you should specifically have a look at the section on browser autoconfig. In the meantime, let's just get Squid going, and we will configure browsers once you have a cache to talk to.
+</p>
+
+<p>Since the cache is not protected by the firewall, it must be very carefully configured - it must only accept requests from the firewall, and must not run any strange services. If possible, you should disable telnet, and use something like SSH (Secure SHell) instead. The access control lists (which you will setup shortly) must only allow the firewall, otherwise people will be able to relay their requests through your cache, using your bandwidth.
+</p>
+
+<p>If you place the cache outside the firewall, your client PCs will be configured to use the firewall as their proxy server (this is probably the case already). The firewall must be configured to hand-off client HTTP requests to the cache server. The cache must be configured to only allow HTTP requests when from the firewall's outside IP address. If not configured this way, other Internet users could use your cache server as a relay, using your bandwidth and hardware resources for illegitimate (and possibly illegal) purposes.
+</p>
+
+<p>With your cache server on the outside network, you should treat the machine as a completely untrusted host, lest a cracker find a hole somewhere on the system. It is recommended that you place the cache server on a dedicated firewall network card, or on a switched ethernet port. This way, if your cache server were to be cracked, the cracker would only be able to read passing HTTP data. Since the majority of sensitive information is sent via email, this would reduce the potential for sensitive data loss.
+</p>
+
+<p>Since your cache server only accepts requests from the firewall, there is no <code class='squid-tag-inline'>cache_peer</code> line needed in the <em>squid.conf</em>. If you have to talk to your ISP's cache you will, of course, need one: see the section on this a bit further back.
+</p>
+
+<h4>DMZ</h4>
+<p>The best place for a cache is your DMZ.
+</p>
+
+<p>If you are concerned with the security of your cache server, and want to be able to communicate with outside cache servers (using ICP), you may want to put your cache on the DMZ.
+</p>
+
+<p>With Squid in your DMZ, internal client PCs are setup to proxy to the firewall. The firewall is then responsible for handing-off these HTTP requests to the cache server (so the firewall in fact treats the cache server as a parent).
+</p>
+
+<p>Since your cache server is (essentially) on the outside of the firewall, the cache doesn't need to treat the firewall as a parent or sibling: it only accepts requests from the firewall: it never passes them <em>to</em> the firewall.
+</p>
+
+<p>If your cache is outside your firewall, you will need to configure your client PCs not to use the firewall as a proxy server for internal hosts. This is quite easy, and is discussed in the chapter on browser configuration.
+</p>
+
+<p>Since the firewall is acting as a filter between your cache and the outside world, you are going to have to open up some ports on the firewall. The cache will need to be able to connect to port 80 on any machine on the outside world. Since some valid web servers will run on ports other than 80, you should consider allowing connections to any port from the cache server. In short, allow connections to:
+</p>
+<ul>
+<li>Port 80 (for normal HTTP requests)</li>
+<li>Port 443 (for HTTPS requests)</li>
+<li>Ports higher than 1024 (site search engines often use high-numbered ports)</li>
+</ul>
+
+<p>If you are going to communicate with a cache server outside the firewall, you will need even more ports opened. If you are going to communicate with ICP, you will need to allow UDP traffic from and to your cache machine on port 3130. You may find that the cache server that you are peering with uses different ports for reply packets. It's probably a bad idea to open all UDP traffic, though.
+</p>
+
+<h3>Packet Filtering firewalls</h3>
+<p>Squid will normally live on the inside of your packet-filtering firewall. If you have a DMZ, it may be best to put your cache on this network, as you may want to allow UDP traffic to and from the cache server (to communicate with other caches).
+</p>
+
+<p>To configure your firewall correctly, you should make the minimum number of <em>holes</em> in your filter set. In the remainder of this section we assume that your internal machines can connect to the cache server unimpeded. If your cache is on the DMZ (or outside the firewall altogether) you will need to allow TCP connections from your internal network (on a random source port) to the HTTP port that Squid will be accepting requests on (this is the port that you set a bit earlier, in the [[#Setting_Squid.27s_HTTP_Port | Setting Squid's HTTP Port]] section of this chapter).
+</p>
+
+<p>First, let's consider the firewall setup when you do not query any outside caches. On accepting a request, Squid will attempt to connect to a machine on the Internet at large. Almost always, the destination port will be the default HTTP port, port 80. A few percent of the time, however, the request will be destined for a high-numbered port (any port number higher than 1023 is a high-numbered port). Squid always sources TCP requests <em>from</em> a high-numbered port, so you will thus need to allow TCP requests (all HTTP is TCP-based) from a random high-numbered port to both port 80 and any high-numbered port.
+</p>
+
+<p>There is another low-numbered port that you will probably need to open. The HTTPS port (used for secure Internet transactions) is normally listening on TCP port 443, so this should also be opened.
+</p>
+
+<p>In the second situation, let's look at cache-peering. If you are planning to interact with other caches, you will need to open a few more ports. First, let's look at ICP. As mentioned previously, ICP is UDP-based. Almost all ICP-compliant caches listen for ICP requests on UDP port 3130. Squid will always source requests from port 3130 too, though other ICP-compliant caches may source their requests from a different port.
+</p>
+
+<p>It's probably not a good idea to allow these UDP packets no matter what source address they come from. Your filter should probably specify the IP addresses for each of the caches that you wish to peer from, rather than allowing UDP packets from any source address. That should be it: you should now be able to save the config file, and get ready to start the Squid program.
+</p>
+

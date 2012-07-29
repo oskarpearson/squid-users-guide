@@ -1,0 +1,494 @@
+<!-- We need to be write a reasonable introduction! :) -->
+
+<h1>Hardware Requirements</h1>
+<p>Caching stresses certain hardware subsystems more than others. Although the key to good cache performance is good overall system performance, the
+following list is arranged in order of decreasing importance:
+</p>
+
+<ul>
+<li>Disk random seek time</li>
+<li>Amount of system memory</li>
+<li>Sustained disk throughput</li>
+<li>CPU power</li>
+</ul>
+
+<p>Do not drastically underpower any one subsystem, or performance <em>will</em>
+suffer.
+</p>
+
+<p>In the case of catastrophic hardware failure you must have a ready supply
+of alternate parts. When your cache is critical, you should have a (working!)
+standby machine with operating system and Squid installed. This can be kept
+ready for nearly instantaneous swap-out. This will, of course, increase
+your costs, something that you may want to take into account. Chapter 13
+covers standby procedures in detail.
+</p>
+
+<h2>Gathering Statistics</h2>
+<p>When deciding on your cache's horsepower, many factors must be
+taken into account. To decide on your machine, you need an idea of the load
+that it will need to sustain: the peak number of requests per minute.
+This number indicates the number of 'objects' downloaded in a minute by
+clients, and can be used to get an idea of your cache load.
+</p>
+
+<p>Computing the peak number of requests is difficult, since it depends on the
+browsing habits of users.
+</p>
+
+<p>This, in turn, makes deciding on the required hardware difficult. If you
+don't have many statistics as to your Internet usage, it is probably worth
+your while installing a test cache server (on any machine that you have
+handy) and pointing some of your staff at it. Using ratios you can
+estimate the number of requests with a larger user base.
+</p>
+
+<p>When gathering statistics, make sure that you judge the 'peak' number of
+requests, rather than an <em>average</em> value. You shouldn't take the number
+of requests per day and divide, since your peak (during, for example, lunch
+hour) can be many times your average number of requests.
+</p>
+
+<p>It's a very good idea to over-estimate hardware requirements.
+Stay ahead of the growth curve too, since an overloaded cache can spiral
+out of control due to a transient network problems. If a cache cannot deal
+with incoming requests for some reason (say a DNS outage), it still continues
+to accept incoming requests, in the hope that it can deal with them.
+If no requests can be handled, the number of concurrent connections
+will increase at the rate that new requests arrive.
+</p>
+
+<p>If your cache runs close to capacity, a temporary glitch can increase the
+number of concurrent, waiting, requests tremendously. If your cache can't
+cope with this number of established connections, it may never be able to
+recover, with current connections never being cleared while
+it tries to deal with a huge backlog.
+</p>
+
+<p>Squid 2.0 may be configured to use threads to perform asynchronous
+Input/Output on operating systems that supports Posix threads.
+Including async-IO can dramatically reduce your cache latency, allowing you
+to use a less powerful machine. Unfortunately not all systems support
+Posix threads correctly, so your choice of hardware can depend on the
+abilities of your operating system. Your choice of operating system is
+discussed in the next section - see if your system will support threads
+there.
+</p>
+
+<h2>Hard Disks</h2>
+
+<h3>Disk Speed</h3>
+<p>There are numerous things to consider when buying disks. Earlier on we
+mentioned the importance of disks with a fast random-seek time, and with high
+sustained-throughput. Having the world's fastest drive is not useful,
+though, if it holds a tiny amount of data. To cache effectively you need
+disks that can hold a significant amount of downloaded data, but that are
+fast enough to not slow your cache to a crawl.
+</p>
+
+<p>Seek time is one of the most important considerations if your cache is
+going to be loaded. If you have a look at a disk's documentation there is
+normally a <em>random seek time</em> figure. The smaller this value the
+better: it is the average time that the disk's heads take to move from a
+random track to another (in milliseconds).
+</p>
+
+<p>Operating systems do all sorts of interesting things (which are not covered
+here) to attempt to speed up disk access times: waiting for disks
+can slow a machine down dramatically. These operating system features make
+it difficult to estimate how many requests per second your cache can handle
+before being slowed by disk access times (rather than by network speed). In
+the next few paragraphs we ignore operating system readahead, inode update
+seeks and more: it's a <em>back of the envelope</em> approximation for your
+use.
+</p>
+
+<p>If your cache does not use <em>asynchronous Input-Output</em> (described in
+the Operating system section shortly) then your cache loses a lot of the
+advantage gained by multiple disks. If your cache is going to be loaded
+(or is running anywhere approaching capacity according to the formulae
+below) you must ensure that your operating system supports posix threads!
+</p>
+
+<p>A cache with one disk has to seek at least once per request (ignoring
+RAM caching of the disk and inode update times). If you have only one disk,
+the formula for working out seeks per second (and hence requests per
+second) is quite simple:
+</p>
+
+<pre>
+requests per second = 1000/seek time
+</pre>
+
+<p>Squid load-balances writes between multiple cache disks, so if you
+have more than one data disk your seeks-per-second per disk will be lower.
+Almost all operating systems will increase random seek time in a
+semi-linear fashion as you add more disks, though others may have a small
+performance penalty. If you add more disks to the equation, the <em>requests per second</em>
+value becomes even more approximate! To simplify things in the
+meantime, we are going to assume that you use only disks with the same seek
+time. Our formula thus becomes:
+</p>
+
+<pre>
+theoretical requests per second = 1000/(seek time / number of disks)
+</pre>
+
+<p>If I have three disks - all have 12ms seek times. I can thus (theoretically, as always) handle:</p>
+
+<pre>
+requests per second = 1000/(12/3) = 1000/4 = 250 requests per second
+</pre>
+
+<p>While we are on this topic: many people query the use of IDE disks in
+caches. IDE disks these days generally have very similar seek times to SCSI
+disks, and (with DMA-compatible IDE controllers) approach the speed of data
+transfer without slowing the whole machine down.
+</p>
+
+<p>Deciding how much disk space to allocate to Squid is difficult. For the
+pilot project you can simply allocate a few megabytes, but this is unlikely
+to be useful on a production cache.
+</p>
+
+<h3>Disk Space</h3>
+<p>The amount of disk space required depends on quite a few factors.
+</p>
+
+<p>Assume that you were to run a cache just for yourself. If you were to
+allocate 1 gig of disk, and you browse pages at a rate of 10 megabytes per
+day, it will take at least 100 days for you to fill the cache.
+</p>
+
+<p>You can thus see that the rate of incoming cache queries influences the
+amount of disk to allocate.
+</p>
+
+<p>If you examine the other end of the scale, where you have 10 megabytes of
+disk, and 10 incoming queries per second, you will realize that at this rate
+your disk space will not last very long. Objects are likely to be pushed
+out of the cache as they arrive, so getting a hit would require two people
+to be downloading the object at almost exactly the same time. Note that the
+latter is definitely not impossible, but it happens only occasionally on
+loaded caches.
+</p>
+
+<p>The above certainly appears simple, but many people do not extrapolate.
+The same relationships govern the expulsion of objects from your cache at
+larger cache store sizes. When deciding on the amount of disk space to
+allocate, you should determine approximately how much data will pass
+through the cache each day. If you are unable to determine this, you could
+simply use your theoretical maximum transfer rate of your line as a basis.
+A 1mb/s line can transfer about 125000 bytes per second. If all clients
+were setup to access the cache, disk would be used at about 125k per
+second, which translates to about 450 megabytes per hour. If the bulk of your
+traffic is transferred during the day, you are probably transferring 3.6
+gigabytes per day. If your line was 100% used, however, you would probably
+have upgraded it a while ago, so let's assume you transfer 2 gigabytes
+per day. If you wanted to keep ALL data for a day, you would have to have 2
+gigabytes of disk for Squid.
+</p>
+
+<p>The feasibility of caching depends on two or more users visiting the same
+page while the object is still on disk. This is quite likely to happen with
+the large sites (search engines, and the default home pages in respective
+browsers), but the chances of a user visiting the same obscure page is
+slim, simply due to the volume of pages. In many cases the obscure pages
+are on the slowest links, frustrating users. Depending on the number of
+users requesting pages you should keep pages for longer, so that the
+chances of different users accessing the same page twice is higher.
+Determining this value, however, is difficult, since it also depends on the
+average object size, which, in turn, depends on user habits.
+</p>
+
+<p>Some people use RAID systems on their caches. This can dramatically
+increase availability, but a RAID-5 system can reduce disk throughput
+significantly. If you are really concerned with uptime, you may find a RAID
+system useful. Since the actual data in the cache store is not vital,
+though, you may prefer to manually fail-over the cache, simply
+re-formatting or replacing drives. Sure, your cache may have a lower
+hit-ratio for a short while, but you can easily balance this minute cost
+against what hardware to do automatic failover would have cost you.
+</p>
+
+<p>You should probably base your purchase on the bandwidth description above,
+and gather data to decide when to add more disk space.
+</p>
+
+<h2>Memory/Ram Requirements</h2>
+<p>Squid keeps an in-memory table of objects in RAM. Because of the way that
+Squid checks if objects are in the file store, fast access to the table is
+very important. Squid slows down dramatically when parts of the table are in
+swap.
+</p>
+
+<p>Since Squid is one large process, swapping is particularly bad. If the
+operating system has to swap data, Squid is placed on the 'sleeping tasks'
+queue, and cannot service other established connections. (? hmm. it will
+actually get woken up straight away. I wonder if this is relevant ?)
+</p>
+
+<p>Each object stored on disk uses about 75 bytes (? get exact value ?) of RAM
+in the index. The average size of an object on the Internet is about 13kb, so
+if you have a gigabyte of disk space you will probably store around about
+80 000 objects.
+</p>
+
+<p>At 75 bytes of RAM per object, 80 000 objects require about six megabytes of
+RAM. If you have 8gigs of disk you will need 48Mb of RAM just for the
+object index. It is important to note that this excludes memory for your
+operating system, the Squid binary, memory for in-transit objects and spare
+RAM for for disk cache.
+</p>
+
+<p>So, what should your sustained-thoughput of your disks be? Squid tends
+to read in small blocks, so throughput is of lesser importance than random
+seek times. Generally disks with fast seeks are high throughput, and most
+disks (even IDE disks these days) can transfer data faster than clients can
+download it from you. Don't blow a year's budget on really high-speed
+disks, go for lower-seek times instead - or add more disks.
+</p>
+
+<h2>CPU Power</h2>
+<p>Squid is not generally CPU intensive. On startup Squid can use a lot of CPU
+while it works out what is in the cache, and a slow CPU can slow down
+access to the cache for the first few minutes upon startup. A Pentium 133
+machine generally runs pretty idle, while receiving 7 TCP requests a second
+</p>
+
+<p>A multiprocessor machine generally doesn't increase speed dramatically:
+only certain portions of the Squid code are threaded. These sections of
+code are not processor intensive either: they are the code paths where
+Squid is waiting for the operating system to complete something. A
+multiprocessor machine generally does not reduce these wait times: more
+memory (for caching of data) and more disks may help more.
+</p>
+
+<h1>Choosing an Operating System</h1>
+
+<p>Where I work, we run many varieties of Unix. When I first installed Squid it was on my desktop Linux machine - if I break it by mistake it's not going to cause users hassles, so I am free to do on it what I wish.
+</p>
+
+<p>Once I had tested Squid, we decided to allow general access to the cache. I installed Squid on the fastest unused machine we had available at the time: a (then, at least) top of the range Pentium 133 with 128Mb of RAM running FreeBSD.
+</p>
+
+<p>I was much more familiar with Linux at that stage, and eventually installed Linux on the public cache machine. Though running Linux caused some inconveniences (specifically with low per-process filehandle limits), it was the right choice, simply because I could maintain the machine better. Many times my experience with Linux has gotten me out of potentially sticky situations.
+</p>
+
+<p>If your choice of operating system saves you time, and runs Squid, use it! Just as I didn't use Digital Unix (Squid is developed on funded Digital Unix machines at NLANR), you don't need to use Linux just because I do.
+</p>
+
+<p>Most modern operating systems sport both similar performance and similar feature sets. If your system is commonly used and roughly Posix compliant at the source level, it will almost certainly be supported by Squid.
+</p>
+
+<p>When was the last time you had an outage due to hardware failure? Unless you are particularly unlucky, the interval between hardware failures is low. While the quality of hardware has increased dramatically, software often does not keep pace. Many outages are caused by faulty application of operating system software. You must thus be able to pick up the pieces if your operating system crashes for some reason.
+</p>
+
+<h2>Experience</h2>
+<p>If you normally work on a specific operating system, you should probably not use your cache as a system to experiment with a new 'flavor' of Unix. If you have more experience in an operating system, you should use that system as the basis for your cache server. Customers rapidly turn off caching when a cache stops accepting requests (while you learn your way around some 'feature').
+</p>
+
+<p>Your cache system will almost certainly form a core part of your network as soon as it is stable. You must be able to return the system to working order in minimal time in the event of a system failure, and this is where your existing experience becomes crucial. If the failure happens out of business hours you may not be able to get technical support from your vendor. A dialup ISP's hours of business differ dramatically to that of Operating System vendors.
+</p>
+
+<h2>Features</h2>
+<p>Though most operating systems support similar features, there are often no standards for functions required for some of the less commonly used operating system features. One example is transparency: many operating systems can now support transparent redirection to a local program, but almost all of them function in a different way, since there is not a real standard for the way an operating system is supposed to function in this scenario.
+</p>
+
+<p>If you are unable to find information about Squid on your operating system, you may want to organise a trial hardware installation (assuming that you are using a commercial operating system) as a test. Only when you have the system running can you be sure that your operating system supports the required features.
+</p>
+
+<p>If you are using Squid without extensions like transparency and ARP access control lists, you should not have problems. For your convenience a table of operating system support of specific features is included. Since Squid is constantly being developed, it's likely that this list will change.
+</p>
+
+<h2>Compilers</h2>
+<p>Squid is written on Digital Unix (?version ?) machines running the GNU C compiler (GCC). GCC is included with free operating systems such as Linux and FreeBSD, and is easily available for many other operating systems and hardware platforms. The GNU compiler adheres as closely to the ANSI C standard as possible, so if a different compiler is included with your operating system, it may (or may not) have trouble interpreting Squid's source code, depending on it's level of ANSI compliance. In practice, most compilers work fine.
+</p>
+
+<p>Some commercial compilers choose backward compatibility with older versions over ANSI compliance. These compilers generally support an option that turns on 'ANSI compliant mode'. If you have trouble compiling Squid you may have to turn this mode on. (? is this still valid? I remember things like this back in the Borland C days - though I seem to remember this on a Unix system too... ?) In the worst possible scenario you may have to compile GCC with your existing compiler and use GCC to compile Squid.
+</p>
+
+<p>If you do not have a compiler, you may be able to find a precompiled version of GCC for your system on the Internet. Be very careful when installing software from untrusted sources. This is discussed shortly in the "precompiled binary" section.
+</p>
+
+
+<p>If you cannot find versions of GCC for your platform, you may have to factor in the cost of the compiler when deciding on your operating system and hardware.
+</p>
+
+<h1>Basic System Setup</h1>
+<p>Before you even install the operating system, it's best to get an idea as to how the system will look once Squid is up and running. This will allow you to partition the disks on the machine so that their mount path will match Squid's default configuration.
+</p>
+
+<h2>Default Squid directory structure</h2>
+<p>Normally Squid's directory tree looks like this:
+</p>
+
+<pre>
+        /usr/local/squid/
+        /usr/local/squid//bin/
+        /usr/local/squid//cache/
+        /usr/local/squid//etc/
+        /usr/local/squid//src/squid-2.0/
+</pre>
+
+<p>Working through each directory below <em>/usr/local/squid</em> in the order presented above:
+</p>
+
+<p>Back to the <em>cache</em> directory: if you have more than one partition for the cached data, you can make subdirectories for each of the filesystems in the cache directory. Normally people name these directories <em>cache1</em>, <em>cache2</em>, <em>cache3</em> and so forth. Your cache directories should be mounted somewhere like <em>/usr/local/squid/cache/1/</em> and <em>/usr/local/squid/cache/2/</em>. If you have only one cache disk, you can simply name the directory <em>/usr/local/squid/cache/</em>.
+</p>
+
+<p>In Squid-1.1 cache directories had to be identical in size. This is no longer the case, so if you are upgrading to Squid 2.0 you may be able to resize your cache partitions. To do this, however, you may have to repartition disks and reformat.
+</p>
+
+<p>When you upgrade to the latest version of Squid, it's a good idea to keep the old working compiled source tree somewhere. If you upgrade to the latest Squid and encounter problems, simply kill Squid, change to the previous source directory and reinstall the old binaries. This is a lot faster than trying to remember which source tree you were running, downloading it, compiling it, applying local patches and then reinstalling.
+</p>
+
+<h2>User and Group IDs</h2>
+<p>Squid, like most daemon processes on Unix machines, normally runs as the user nobody and with the group nogroup.
+</p>
+
+<p>For the maximum flexibility in allowing root and non-root users to manipulate the Squid configuration, you should make both a new user and two new groups, specifically for the Squid system, rather than using the nobody and nogroup IDs. Throughout this book we assume that you have done so, and that a group and a user have been created, (both called <em>squid</em>) and a second admin group, called <em>squidadm</em>. The <em>squid</em> user's primary group should be <em>squid</em>, and the user's home directory should be <em>/usr/local/squid</em> (the default squid software install destination).
+</p>
+
+<p>When you have multiple administrators of a cache machine, it is useful to have a dedicated <em>squidadm</em> group, with sub-administrators added to this group. This way, you don't have to change to the root user whenever you want to make changes to the Squid config. It's possible, for users in the squidadm group to gain root access, so you shouldn't place people without root access in the squidadm group.
+</p>
+
+<p>When the config file has been changed, a signal has to be sent to the Squid process to inform it that that config files are to be re-read. Sending signals to running processes isn't possible when the signal sender isn't the same userid as the receiver. Other config file maintainers need permission to change their user-id (either by using the 'su' command, or by logging in with another session) to either the root user or to the user Squid is running as.
+</p>
+
+<p>In some environments cache software maintainers aren't trusted with root access, and the user <em>nobody</em> isn't allowed to login. The best solution is to allow users that need to make changes to the config file access to a reload script using <em>sudo</em>. <em>Sudo</em> is available for many systems, and source code is available.
+</p>
+
+<p>In Chapter 4 we go through the process of changing the user-id that Squid runs as, so that files Squid creates are owned by the <em>squid</em> user-id, and by the group <em>squid</em>. Binaries are owned by root, and config files are changeable by the <em>squidadm</em> group.
+</p>
+
+<h1>Getting Squid</h1>
+<p>Now that your machine is ready for your Squid install, you need to download and install the Squid program. This can be done in two ways: you can download a <em>source</em> version and compile it, or you can download a <em>precompiled binary</em> version and install that, relying on someone else to do the compilation for you.
+</p>
+
+<p>Binary versions of Squid are generally easier to install than source code versions, specifically if your operating system vendor distributes a <em>package</em> which you can simply install.
+</p>
+
+<p>Installing Squid from source code is recommended. This method allows you to turn on compile-time options that may not be included in distributed binary versions (one of many examples: <em>SNMP</em> support is not included into the source at compile time unless it is specifically included, and most binary versions available do not include snmp support). If your operating system has been optimized so that Squid can run better (let's say you have increased the number of open filehandles per process) a precompiled binary will not take advantage of this tuning, since your compiler header files are probably different to the ones where the binaries were compiled.
+</p>
+
+<p>It's also a little worrying running binaries that other people distribute (unless, of course, they are officially supplied by your operating system vendor): what if they have placed a <em>trojan</em> into the binary version? To ensure the security of your system it is recommended that you compile from the official source tree.
+</p>
+
+<p>Since we suggest installing from source code first, we cover that first: if you have to download a Squid binary from somewhere, simply skip to the next sub-section: <em>Getting a binary version of Squid</em>.
+</p>
+
+<h2>Getting the Squid source code</h2>
+<p>Squid source is mirrored by numerous sites. For a list of mirrors, have a look at the <a href='http://www.squid-cache.org/Mirrors/'>Squid Proxy Mirror Page</a>
+</p>
+
+<p>Deciding which of the available files to download can become an issue, especially if you are not familiar with the Squid version naming convention. Squid is (as of this writing) in version 2. As features are added, the minor version number is incremented (Squid 2.0 becomes Squid 2.1, then Squid 2.2 etc etc). Since new features may introduce new bugs, the first version including new features is distributed as a <em>pre-release</em> (or beta) version. The first pre-release of Squid 1.2 is called <em>squid-2.1.PRE1-src.tar.gz</em>. The second is <em>squid-2.1.PRE2-src.tar.gz</em>. Once Squid is considered stable, a general release version is distributed: the first release version is called <em>squid-2.0.RELEASE-src.tar.gz</em>, the second (which would include minor bug fixes) <em>squid-2.0.RELEASE2-src.tar.gz</em>.
+</p>
+
+<p>In short, files are named as follows: <em>squid-2.minor-version-number.stability-info.release-number.tar.gz</em>. Unless you are a Squid developer, you should download the last available <em>RELEASE</em> version: you are less likely to encounter bugs this way.
+</p>
+
+<p>Squid source is normally available via FTP (the File Transfer Protocol), so you should be able to download Squid source by using the <em>ftp</em> program, available on almost every Unix system. If you are not familiar with ftp, you can simply select the mirror closest to you with your browser and save the Squid source to your disk by right-clicking on the filename and selecting <em>save as</em> (do not simply click on the filename - many browsers attempt to extract compressed files, printing the tar file to y
+our browser window: this is definitely not what you want!). Once the download is complete, transfer the file to the cache machine.
+</p>
+
+<h2>Getting Binary Versions of Squid</h2>
+<p>Finding binary versions of Squid to install is easy: deciding which binary to trust is more difficult. If you do not choose carefully, someone could undermine your system security. If you cannot compile Squid cache, but know (and trust) someone that can do it for you, get them to help. It's better than downloading a version contributed by someone that you don't know.
+</p>
+
+<h1>Compiling Squid</h1>
+<p>Compiling Squid is quite easy: you need the right tools to do the job, though. First, let's go through getting the tools, then you can extract the source code package, include optional Squid components (using the <em>configure</em> command) and then actually compile the distributed code into a binary format.
+</p>
+
+<p>A word of warning, though: this is the stage where most people run into problems. If you haven't compiled source before, try and follow the next section in order - it shouldn't be too bad. If you don't manage to get Squid running, at least you have gained experience.
+</p>
+
+<h2>Compilation Tools</h2>
+<p>GNU utilities mentioned below are avaliable via FTP from the official GNU ftp site or one of it's mirrors. A list of mirrors is available at http://www.gnu.org/, or download them directly from <em>ftp://ftp.gnu.org/</em>.
+</p>
+
+<p>The GNU compiler is only distributed as source (creating a <em>chicken-and-egg</em> problem if you do not have a compiler) you may have to do an Internet search (using one of the standard search engines) to try and find a binary copy of the GNU compiler for your system. The Squid source is distributed in compressed form. First a standard tar file is created. This file is then compressed with the GNU <em>gzip</em> program. To decompress this file you need a copy of gzip. GCC (The Gnu C Compiler) is the recommended compiler: the developers wrote Squid with it, and it is available for almost all systems.
+</p>
+
+<p>You will also need the <em>make</em> program, of which there is also a GNU version easily available.
+</p>
+
+<p>If possible, install a C debugger: the GNU debugger (GDB) is available for most platforms. Though a debugger is not necessary for installation, but is very useful in the case of software bugs (as discussed in chapter 13).
+</p>
+
+<h2>Unpacking the Source Archive</h2>
+
+<p>Earlier we looked at the tree structure of the <em>/usr/local/squid</em> directory. I suggest extracting the Squid source to the <em>/usr/local/squid/src</em> directory. So, create the directory and copy the downloaded Squid <em>tar.gz</em> file into it.
+</p>
+
+<p>First let's decompress the file. Some versions of tar can decompress the file in one step, but for compatability's sake we are going to do it in two steps. Decompress the tar file by running <em>gzip -dv squid-version.tar.gz</em>. If all has gone well you should have a file called <em>squid-version.tar</em> in the current directory. To get the files out of the "tarball", run <em>tar xvf squid-version.tar</em>.
+</p>
+
+<p>Tar automatically puts the files into a subdirectory: something like <em>squid-2.1.PRE2</em>. Change into the extracted directory,and we can start configuring the Squid source.
+</p>
+
+
+<h2>Running configure</h2>
+
+<p>Now that you have decided which options to use, it's time to run configure. Here's an example:
+</p>
+
+<pre> ./configure --enable-err-language=Bulgarian --prefix=/usr/local</pre>
+
+<p>Running ./configure with the options that you have chosen should go smoothly. In the unlikely event that configure returns with an error message, here are some suggestions that may help.
+</p>
+
+
+<h4>Broken compilers</h4>
+<p>The most common problem for new installers is that there is a problem with the installed compiler (or the headers) for the system.
+</p>
+
+<p>To test this theory simply try and run configure with no options at all. If you still get an error message it is almost certainly a compiler or header file problem.
+</p>
+
+<p>To make sure try and compile a program that uses some of the less used system calls and see if this compiles.
+</p>
+
+<p>If your compiler doesn't compile files correctly, you might want to check if the header files exist, and if they do, permissions on the directory and the include files themselves.
+</p>
+
+<p>If you have installed GCC in a non-standard directory, or if you are cross compiling, you may need configure to append options to the GCC command it uses during it's tests. You can get configure to append options to the GCC command line by setting the 'CFLAGS' shell variable prior to running configure. If, for example, you compiler only works when you you modify the default i
+nclude directory, you can get configure to append that option to the default command line with a (Bourne Shell) command like:
+</p>
+
+<pre>CFLAGS=-I/usr/people/staff/oskar/gcc/include export CFLAGS</pre>
+
+<h3>Incompatible Options</h3>
+<p>Some configuration options exclude the use of others. This is another common cause of problems. To test this you should just try and run configure without any options at all, and see if the problem disappears. If so, you can try and work out which option is causing the conflict by adding each option to the configure command line one-by-one. You may find that you have to choose between two options (for example Async-IO and the DL-Malloc routines). In this case you may have to decide which of the options is the most important in your setup.
+</p>
+
+<h2>Compiling the Squid Source</h2>
+<p>Now that you have configured Squid, you need to make the Squid binaries. You should simply have to run <em>make</em> in the extracted source directory, and a binary will be created as <em>src/squid</em>. 
+</p>
+
+<pre>
+cache:/ # cd /usr/local/squid/src/squid-2.2.RELEASE
+cache:/usr/local/squid/src/squid-2.2.RELEASE # make
+</pre>
+
+<p>If the compilation fails, it may be because of conflicting configure options as described in the configure section. Follow the same instructions described there to find the offending option. (You should run <em>make clean</em> between configure runs, to ensure that old binaries are removed) As a start, try running configure without any options at all and then see if <em>make</em> completes. If this works, try additional configure options one at a time to see which one causes the problem.
+</p>
+
+<h2>Installing the Squid binary</h2>
+<p>The <em>make</em> command creates the binary, but doesn't install it.
+</p>
+
+<p>Running <em>make install</em> creates the <em>/usr/local/squid/bin</em> and <em>/usr/local/squid/etc</em> subdirectories, and copies the binaries and default config files in the appropriate directories. Permissions may not be set correctly, but we will work through all created directories and set them up correctly shortly.
+</p>
+
+<p>This command also copies the relevant config files into the default directories. The standard config file included with the source is placed in the <em>etc</em> subdirectory, as are the <em>mime.types</em> file and the default Squid MIB file (<em>squid.mib</em>).
+</p>
+
+<p>If you are upgrading (or reinstalling), <em>make install</em> will overwrite binary files in the bin directory, but will not overwrite your painfully manipulated configuration files. If the destination configuration file exists, <em>make install</em> will instead create a file called <em>filename.default</em>. This allows you to check if useful options have been added by comparing config files.
+</p>
+
+<p>If all has gone well you should have a fully installed (but unconfigured) Squid system setup.
+</p>
+
+<p><strong>Congratulations!</strong>
+</p>

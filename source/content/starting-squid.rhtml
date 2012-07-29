@@ -1,0 +1,183 @@
+<h1>Running Squid</h1>
+<p>Squid should now be configured, and the directories should have the correct permissions. We should now be able to start Squid, and you can try and access the cache with a web browser. Squid is normally run by starting the RunCache script. RunCache (as mentioned ealier) restarts Squid if it dies for some reason, but at this stage we are merely testing that it will run properly: we can add it to startup scripts at a later stage.
+</p>
+
+<p>Programs which handle network requests (such as inetd and sendmail) normally run in the background. They are run at startup, and log any messages to a file (instead of printing it to a screen or terminal, as most user-level programs do.) These programs are often referred to as <em>daemon</em> programs. Squid is such a program: when you run the squid binary, you should be immediately returned to the command line. While it looks as if the program ran and did nothing, it's actually sitting in the background waiting for incoming requests. We want to be able to see that Squid's actually doing something useful, so we increase the debug level (using <em>-d 1</em>) and tell it not to dissapear into the background (using <em>-N</em>.) If your machine is not connected to the Internet (you are doing a trial squid-install on your home machine, for example) you should use the <em>-D</em> flag too, since Squid tries to do DNS lookups for a few common domains, and dies with an error if it is not able to resolve them.
+</p>
+
+<p>The following output is that printed by a default install of Squid:</p>
+
+<pre><code>
+cache1:~ # /usr/local/squid/sbin/squid -N -d 1 -D
+Squid reads the config file, and changes user-id's here:
+1999/06/12 19:16:20| Starting Squid Cache version 2.2.DEVEL3 for i586-pc-linux-gnu...
+1999/06/12 19:16:20| Process ID 4121
+</code></pre>
+
+<p>Each concurrent incoming request uses at least one filedescriptor. 256 filedescriptors is only enough for a small, lightly loaded cache server, see Chapter 12 for more details. Most of the following is diagnostic: 
+</p>
+<pre><code>
+1999/06/12 19:16:20| With 256 file descriptors available
+1999/06/12 19:16:20| helperOpenServers: Starting 5 'dnsserver' processes
+1999/06/12 19:16:20| Unlinkd pipe opened on FD 13
+1999/06/12 19:16:20| Swap maxSize 10240 KB, estimated 787 objects
+1999/06/12 19:16:20| Target number of buckets: 15
+1999/06/12 19:16:20| Using 8192 Store buckets, replacement runs every 10 seconds
+1999/06/12 19:16:20| Max Mem size: 8192 KB
+1999/06/12 19:16:20| Max Swap size: 10240 KB
+1999/06/12 19:16:20| Rebuilding storage in Cache Dir #0 (DIRTY)
+</code></pre>
+
+<p>The next step is to load Icon files. When you connect to an ftp server without a cache, your browser chooses icons to match the files based on their filenames. When you connect through a cache server, it assumes that the page returned will be in html form, and will include tags to load any images so that the directory listing looks <em>normal</em>. Squid adds these tags, and has a collection of icons that it refers clients to. These icons are stored in <em>/usr/local/squid/etc/icons/</em>. If Squid has permission problems here, you need to make sure that these files are owned by the appropriate users (in the previous section we set permissions on the files in this directory.)
+</p>
+
+<pre><code>
+1999/06/12 19:16:20| Loaded Icons.
+</code></pre>
+
+<p>The next few lines are the most important. Once you see the <em>Ready to serve requests</em> line, you should be able to start using the cache server. The HTTP port is where Squid is waiting for browser connections, and should be the same as whatever we set it to in the previous chapter. The ICP port should be 3130, the default, and if you have included other protocols (such as HTCP) you should see them here. If you see permission denied errors here, it's possible that you are trying to bind to a low-numbered port (like 80) as a normal user. Try run the startup command as root, or (if you don't have root access on the machine) choose a high-numbered port. Another common error message at this stage is <em>Address already in use</em>. This occurs when another process is already listening to the given port. This could be because Squid is already started (perhaps you are upgrading from an older version which is being restarted by the RunCache script) or you have some other process listening on the same port (such as a web server.)
+</p>
+
+<pre><code>
+1999/06/12 19:16:20| Accepting HTTP connections on port 3128, FD 35.
+1999/06/12 19:16:20| Accepting ICP messages on port 3130, FD 36.
+1999/06/12 19:16:20| Accepting HTCP messages on port 4827, FD 37.
+1999/06/12 19:16:20| Ready to serve requests.
+</code></pre>
+
+
+<p>Once Squid is up-and-running, it reads the cache-store. Since we are starting Squid for the first time, you should see only zeros for all the numbers below:
+</p>
+
+<pre><code>
+1999/06/12 19:16:20| storeRebuildFromDirectory: DIR #0 done!
+1999/06/12 19:16:25| Finished rebuilding storage disk.
+1999/06/12 19:16:25| 0 Entries read from previous logfile.
+1999/06/12 19:16:25| 0 Entries scanned from swap files.
+1999/06/12 19:16:25| 0 Invalid entries.
+1999/06/12 19:16:25| 0 With invalid flags.
+1999/06/12 19:16:25| 0 Objects loaded.
+1999/06/12 19:16:25| 0 Objects expired.
+1999/06/12 19:16:25| 0 Objects cancelled.
+1999/06/12 19:16:25| 0 Duplicate URLs purged.
+1999/06/12 19:16:25| 0 Swapfile clashes avoided.
+1999/06/12 19:16:25| Took 5 seconds ( 0.0 objects/sec).
+1999/06/12 19:16:25| Beginning Validation Procedure
+1999/06/12 19:16:26| storeLateRelease: released 0 objects
+1999/06/12 19:16:27| Completed Validation Procedure
+1999/06/12 19:16:27| Validated 0 Entries
+1999/06/12 19:16:27| store_swap_size = 21k
+</code></pre>
+
+<h1>Testing Squid</h1>
+<p>If all has gone well, we can begin to test the cache. True browser access is only covered in the next chapter, and there is a whole chapter devoted to configuring your browser. Until then, testing is done with the <em>client</em> program, which is included with the Squid source, and is in the <em>/usr/local/squid/bin</em> directory.
+</p>
+
+<p>The <em>client</em> program connects to a cache and request a page, and prints out useful timing information. Since <em>client</em> is available on all systems that Squid runs on, and has the same interface on all of them, we use it for the initial testing.
+</p>
+
+<p>At this stage Squid should be in the foreground, logging everything to your terminal. Since <em>client</em> is a unix program, you need access to a command prompt to run it. At this stage it's probably easiest to simply start another session (this way you can see if errors are printed in the main window).
+</p>
+
+<p>The client program is compiled to connect to localhost on port 3128 (you can override these defaults from the command line, see the output of <em>client -h</em> for more details.)
+</p>
+
+<p>If you are running <em>client</em> on the cache server, and are using port 3128 for incoming requests, you should be able to type a command like this, and the client program will retrieve the page through the cache server:
+</p>
+<pre><code>client http://squid.nlanr.net/</code></pre>
+
+<p>If your cache is running on a different machine you will have to use the <em>-h</em> and <em>-p</em> options. The following command will connect to the machine <em>cache.qualica.comf</em> on port 8080 and retrieve the above web page.
+</p>
+
+<p>The <em>client</em> program can also be used to access web sites directly. As you may remember from reading Chapter 2, the protocol that clients use to access pages through a cache is part of the HTTP specification. The client program can be used to send both "normal" and "cache" HTTP requests. To check that your cache machine can actually connect to the outside world, it's a good idea to test access to an outside web server.
+</p>
+
+<p>The next example will retrieve the page at <em>http://www.qualica.com/</em>, and send the html contents of the page to your terminal.
+</p>
+
+<p>If you have a firewall between you and the internet, the request may not work, since the firewall may require authentication (or, if it's a proxy-level firewall and is not doing transparent proxying of the data, you may explicitly have to tell client to connect to the machine.) To test requests through the firewall, look at the next section.
+</p>
+
+<p>A note about the syntax of the next request: you are telling <em>client</em> to connect directly to the remote site, and request the page <em>/</em>. With a request through a cache server, you connect to the cache (as you would expect) and request a <em>whole url</em> instead of just the path to a file. In essence, both normal-HTTP and cache-HTTP requests are identical; one just happens to refer to a whole URL, the other to a file.
+</p>
+
+<p>Client can also print out timing information for the download of a page. In this mode, the contents of the page aren't printed: only the timing information is. The zero in the below example indicates that Squid is to retrieve the page until interrupted (with Control-C or Break). If you want to retrieve the page a limited number of times, simply replace the zero with a number.
+</p>
+
+<h2>Testing a Cache or Proxy Server with Client</h2>
+<p>FIXME</p>
+<p>If the request through the cache returned the same page as you retrieved with direct access (you didn't receive an error message from Squid), Squid should be up and running. Congratulations! If things aren't going so well for you, you will have received an error message here. Normally, this is because of the acls described in the previous chapter. First, you should have a look at the terminal where you are running Squid (Or, if you are skipping ahead and have put Squid in the background, in the <em>/usr/local/squid/logs/cache.log</em> file.) If Squid encountered some sort of problem, there should be an error or warning in this file. If there are no messages here, you should look at the <em>/usr/local/squid/logs/access.log</em> file next. We haven't covered the details of this file yet, but they are covered in the next section of this chapter. First, though, let's see if your cache can process requests to internal servers. There are many cases where a request will work to internal servers but not to external machines.
+</p>
+
+<h3>Testing Intranet Access</h3>
+<p>If you have a proxy-based firewall, Squid should be configured to pass outgoing requests to the proxy running on the firewall. This quite often presents a problem when an internal client is attempting to connect to an internal (Intranet) server, as discussed in section 2.2.5.2. To ensure that the acl-operator lists created in section 2.2.5.2 are working, you should use client to attempt to connect to a machine on the local network through the cache.
+</p>
+
+<p>If you didn't get an error message from a command like the above, access to local servers should be working. It is possible, however, that the connection could be being passed from the local cache to the parent (across a serial line), and the parent could be connecting back into the local network, slowing the connection enormously. The only way to ensure that the connection is not passing through your parent is to check the access logs, and see which server the connection is being passed to.
+</p>
+
+<h3>Access.log basics</h3>
+<p>The access.log file logs all incoming requests. chapter 11 covers the fields in the access.log in detail. The most important fields are the URL (field 7), and hierarchy access type (field 9) fields. Note that a "-" indicates that there is no data for that field.
+</p>
+
+<p>The following example access.log entries indicate the changes in log output when connecting to another server, without a cache, with a single parent, and with multiple parents.
+</p>
+
+<p>Though fields are seperated by spaces, fields can contain sub-fields, where a "/" indicates the split.
+</p>
+
+<p>When connecting directly to a destination server, field 9 contains two subfields - the key word "DIRECT", followed by the name of the server that it is connecting to. Access to local servers (on your network) should always be DIRECT, even if you have a firewall, as discussed in section 3.1.2. The acl operator always_direct controls this behaviour.
+</p>
+
+<p>When you have configured only one parent cache, the hierarchy access type indicates this, and includes the name of that cache.
+</p>
+
+<p>There are many more types that can appear in the hierarchy access information field, but these are covered in chapter 11.
+</p>
+
+<p>Another useful field is the 'Log Tag' field, field four. In the following example this is the field "TCP_MISS/200".
+</p>
+
+<p>A MISS indicates that the request was not already stored in the cache (or that the page contained headers indicating that the page was not to be cached). A HIT would indicate that the page was already stored in the cache. In the latter case the request time for a remote page should be substantially less than the first occurence in the logs.
+</p>
+
+<p>The time that Squid took to service the request is the second field. This value is in milliseconds. This value should approach that returned by examining a client request, but given operating system buffering there is likely to be a discrepancy.
+</p>
+
+<p>The fifth field is the size of the page returned to the client. Note that an aborted request can end up downloading more than this from the origin server if the quick_abort feature set is turned on in the Squid config file.
+</p>
+
+<p>Here is an example request direct from the origin server:
+</p>
+
+<p>If we use client to fetch the page a short time later, a HIT is returned, and the time is reduced hugely.
+</p>
+
+<p>Some of you will have noticed that the size of the hit has increased slightly. If you have checked the size of a request from the origin server and compared it to that of the same page through the cache, you will also note that the size of the returned data has increased very slightly. Extra headers are added to pages passing through the cache, indicating which peer the page was returned from (if applicable), age information and other information. Clients never see this information, but it can be useful for debugging.
+</p>
+
+<p>Since Squid 1.2 has support for HTTP/1.1, extra features can be used by clients accessing a copy of a page that Squid already has. Certain extra headers are included into the HTTP headers returned in HITS, indicating support for features which are not available to clients when returning MISSes. In the above example Squid has included a header in the page indicating that range-request are supported.
+</p>
+
+<p>If Squid is performing correctly, you should shut Squid down and add it to your startup files.
+</p>
+
+<p>Since Squid maintains an in-memory index of all objects in the cache, a kill -9 could cause corruption, and should never be used. The correct way to shutdown Squid is to use the command:
+</p>
+
+<p>Squid command-line options are covered in chapter 10.
+</p>
+
+<h1>Addition to Startup Files</h1>
+<p>The location of startup files vary from system to system. The location and naming scheme of these files is beyond the scope of this book.
+</p>
+
+<p>If you already have a local startup file, it's a pretty good idea to simply add the RunCache program to that file. Note that you should place RunCache in the background on startup, which is normally done by placing an '&amp;' after the command.
+</p>
+
+<p>The RunCache program attempts to restart Squid if it dies for some reason, and logs basic Squid debug output both to the file "/usr/local/squid/squid.out" and to syslog.
+</p>
+
+<h1>Windows</h1>
+<p>In NT-based Windows systems, Squid NT can be installed as a native service. Simply unzip in the root of C: and run <em>c:\squid\sbin\squid -i</em>. Rename and edit the files in c:\squid\etc and run <em>net start squid</em> or start squid via services.msc. Also, make sure to create <em>c:\squid\var\cache</em> and run <em>squid -z</em> to create swap directories (or you might spend a long time trying to figure out the cryptic "abnormal program termination" message like I did! :) )
+</p>  
