@@ -83,7 +83,7 @@ class Page
   end
 end
 
-['css'].each do |n|
+['css', 'js'].each do |n|
   Dir.entries("source/#{n}/").each do |fn|
     if fn != '.' && fn != '..'
       FileUtils.cp "source/#{n}/#{fn}", "website/#{n}"
