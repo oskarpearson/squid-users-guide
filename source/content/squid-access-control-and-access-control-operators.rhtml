@@ -2,7 +2,7 @@
 <p>Access control lists (acls) are often the most difficult part of the configuration of a Squid cache: the layout and concept is not immediately obvious to most people. Hang on to your hat!
 </p>
 
-<p>Unless [[Squid_Configuration_Basics#Access_Control_Lists_and_Access_Control_Operators|Chapter 4]] is still fresh in your mind, you may wish to skip back and review the access control section of that chapter before you continue. This chapter assumes that you understood the difference between an acl and an acl-operator.
+<p>Unless the <a href='squid-configuration-basics.html'>Squid Configuration Basics</a> chapter is still fresh in your mind, you may wish to skip back and review the access control section of that chapter before you continue. This chapter assumes that you understood the difference between an acl and an acl-operator.
 </p>
 
 <h1>Uses of ACLs</h1>
@@ -49,7 +49,7 @@ http_access deny all
 <p>Inverting the last decision is a simple (if not immediately obvious) solution to one of the most common acl mistakes: not adding a final <em>deny all</em> to the end of your acl list.
 </p>
 
-<p>With this new knowledge, have a look at the first example in this chapter: you will see why I said not to use it in your configs. Given that the last operator denies the local network, local people will not be able to access the cache. The remainder of the Internet, however, will! As discussed in [[Squid_Configuration_Basics#Access_Control_Lists_and_Access_Control_Operators|Chapter 4]], the simplest way of creating a catch-all acl is to match requests when they come from any IP address. When programs do netmask arithmetic a subnet of all zeros will match any IP address. A corrected version of the first example dispenses with the myNet acl.
+<p>With this new knowledge, have a look at the first example in this chapter: you will see why I said not to use it in your configs. Given that the last operator denies the local network, local people will not be able to access the cache. The remainder of the Internet, however, will! As discussed in <a href='squid-configuration-basics.html#acls-and-access-control-operators'>Squid Configuration Basics - Access control Operators</a>, the simplest way of creating a catch-all acl is to match requests when they come from any IP address. When programs do netmask arithmetic a subnet of all zeros will match any IP address. A corrected version of the first example dispenses with the myNet acl.
 </p>
 
 <p>Once the cache is considered stable and is moved into production, the config would change. http_access lines do add a very small amount of overhead, but that's not the only reason to have simple access rulesets: the fewer rulesets, the easier your setup is to understand. The below example includes a <em>deny all</em> rule although it doesn't really need one: you may know of the automatic inversion of the last rule, but someone else working on the cache may not.
@@ -470,7 +470,7 @@ no_cache deny QUERY
 </p>
 
 <h3>The always_direct and never_direct acl-operators</h3>
-<p>These operators help you make controlled decisions about which servers to connect to directly, and which to connect through a parent cache/proxy. I previously discussed this set of options briefly in [[Squid_Configuration_Basics#Ensuring_Direct_Access_to_Internal_Machines|Chapter 3]], during the <em>Basic Installation</em> phase.
+<p>These operators help you make controlled decisions about which servers to connect to directly, and which to connect through a parent cache/proxy. I previously discussed this set of options briefly in <a href='squid-configuration-basics.html#ensuring-direct-access-to-internal-machines'>Squid Configuration Basics - Ensuring_Direct_Access_to_Internal_Machines</a>, during the <em>Basic Installation</em> phase.
 </p>
 
 <p>These tags are covered in detail in the following chapter, in the <em>Peer Selection</em> section.
@@ -481,7 +481,7 @@ no_cache deny QUERY
 </p>
 
 <h1>SNMP Configuration</h1>
-<p>Before we continue: if you wish to use Squid's SNMP functions, you will need to have configured Squid with the <em>--enable-snmp</em> option, as discussed way back in [[Installing_Squid#Simple_Network_Monitoring_Protocol_.28SNMP.29|Chapter 2]]. The Squid source only includes SNMP code if it is compiled with the correct options.
+<p>Before we continue: if you wish to use Squid's SNMP functions, you will need to have configured Squid with the <em>--enable-snmp</em> option, as discussed way back in the <a href='installing-squid.html'>Installing Squid</a> pages. The Squid source only includes SNMP code if it is compiled with the correct options.
 </p>
 
 <p>Normally a Unix SNMP server (also called an agent) collects data from the various services running on a machine, returning information about the number of users logged in, the number of sendmail processes running and so forth. As of this writing, there is no SNMP server which gathers Squid statistics and makes them available to SNMP managment stations for interpretation. Code has thus been added to Squid to handle SNMP queries directly.
@@ -554,7 +554,7 @@ cache1:~ $
 <p>To ensure that some bandwidth is available for work-related downloads, you can use delay-pools. By classifying downloads into segments, and then allocating these segments a certain amount of bandwidth (in kilobytes per second), your link can remain uncongested for "useful" traffic.
 </p>
 
-<p>To use delay-pools you need to have compiled Squid with the appropriate options: you will have to have used the <em>--enable-delay-pools</em> option when running the <em>configure</em> program back in [[Installing_Squid#Compiling_Squid|Chapter 2]].
+<p>To use delay-pools you need to have compiled Squid with the appropriate options: you will have to have used the <em>--enable-delay-pools</em> option when running the <em>configure</em> program back in <a href='installing-squid.html#compiling-squid'>Installing Squid - Compiling Squid</a>.
 </p>
 
 <h2>Slowing down access to specific URLs</h2>
