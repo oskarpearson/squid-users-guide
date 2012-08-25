@@ -5,7 +5,12 @@ require "fileutils"
 
 chapters = {
   'index' => {
-    :title => 'Home',
+    # Open Directory Project currently misspells my name, which means google also misspells it.
+    # I'm hoping this change, plus <meta name="robots" content="NOODP"> in the content
+    # fixes it.
+    # I'm also removing the apostrophe as apparently Google cuts off titles at the apostrophe,
+    # which would make  this the "Oskar Pearson - Squid User" :)
+    :title => 'Squid User Guide - Home - Oskar Pearson',
     :next_chapter => 'terminology-and-technologies',
     :suppress_page_footer => true,
     :suppress_page_header => true
@@ -62,9 +67,10 @@ chapters = {
 
 
 class Page
-  def initialize(page, title, next_chapter, next_chapter_title, suppress_page_header, suppress_page_footer, fn)
+  def initialize(page, title, link_title, next_chapter, next_chapter_title, suppress_page_header, suppress_page_footer, fn)
     @page = page
     @title = title
+    @link_title = link_title || title
     @next_chapter = next_chapter
     @next_chapter_title = next_chapter_title
     @suppress_page_header = suppress_page_header
@@ -96,9 +102,15 @@ Dir.entries("source/content/").each do |fn|
     fn.sub!(/\.rhtml$/, '')
     
     print "Rendering #{fn}.rhtml ... "
+    
+    title = chapters[fn][:title]
+    title = chapters[fn][:title] + " - Squid User Guide" unless fn == 'index'
+    link_title = chapters[fn][:title]
+    
     pg = Page.new(
       "source/content/#{fn}.rhtml",
-      chapters[fn][:title],
+      title,
+      link_title,
       chapters[fn][:next_chapter],
       chapters[ chapters[fn][:next_chapter] ][:title],
       chapters[fn][:suppress_page_header] ? true : false,      
