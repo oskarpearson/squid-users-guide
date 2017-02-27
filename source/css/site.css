@@ -6,7 +6,7 @@
 body {
   /* GFS+Didot is imported from Google fonts */
   font: large/1.556em Palatino,"Palatino Linotype","GFS+Didot",Georgia,"Times New Roman",serif;
-  
+
   margin: 0 auto;
   max-width: 960px;
   word-spacing: 0.1em;
@@ -25,4 +25,15 @@ div.page-header {
 footer p.copyright-and-editing {
   font-size: small;
   font-weight: normal;
+}
+
+.deprecation-notice {
+  background: rgb(231, 135, 77);
+  width: 100%;
+  margin-top: 3em;
+  padding: 3em;
+}
+
+.deprecation-notice p {
+  font-size: larger;
 }
